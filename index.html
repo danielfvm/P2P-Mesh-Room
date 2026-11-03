@@ -1,995 +1,2000 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Mesh Room - Discord Style</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        discord: {
-                            dark: '#313338',
-                            darker: '#1e1f22',
-                            sidebar: '#2b2d31',
-                            accent: '#5865f2',
-                            accentHover: '#4752c4',
-                            green: '#23a55a',
-                            red: '#f23f43',
-                            input: '#383a40'
-                        }
-                    }
-                }
-            }
+    <title>P2P Mesh Room - Lobby System</title>
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- QRCode.js for Invite QR Code generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #141618;
+            --bg-panel: #1b1e21;
+            --bg-input: #111315;
+            --bg-card: #181a1d;
+            --accent: #10b981;
+            --accent-hover: #059669;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border: #2a2e33;
+            --gold: #f59e0b;
         }
-    </script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PeerJS -->
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); height: 100vh; width: 100vw; display: flex; overflow: hidden; user-select: text; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: #2a2e33; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+
+        /* LOBBY SCREEN */
+        #lobby-screen { position: fixed; inset: 0; background: var(--bg-dark); z-index: 5000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .lobby-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
+        .lobby-card h1 { font-size: 1.4rem; color: var(--text-main); text-align: center; }
+        .lobby-subtitle { color: var(--text-muted); text-align: center; font-size: 0.88rem; margin-top: -10px; }
+        .lobby-section-label { color: var(--text-muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+        .lobby-divider { display: flex; align-items: center; gap: 12px; color: #707783; font-size: 0.75rem; text-transform: uppercase; }
+        .lobby-divider::before, .lobby-divider::after { content: ''; height: 1px; background: var(--border); flex: 1; }
+        .lobby-join-row { display: flex; gap: 8px; align-items: stretch; }
+        .lobby-join-row input { min-width: 0; }
+        .lobby-join-btn { flex: 0 0 auto; padding: 0 16px; background: var(--accent); color: white; border: 0; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .lobby-card .lobby-create-btn { background: var(--accent); }
+        .lobby-card .lobby-create-btn:hover { background: var(--accent-hover); }
+        .profile-setup { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 12px 16px; padding: 2px 0 20px; border-bottom: 1px solid var(--border); }
+        .avatar-picker { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; color: white; cursor: pointer; overflow: hidden; border: 1px solid var(--border); flex-shrink: 0; position: relative; grid-row: span 2; }
+        .avatar-picker img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-setup label { color: var(--text-muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+        .profile-hint { color: var(--text-muted); font-size: 0.72rem; line-height: 1.45; grid-column: 2; margin-top: -10px; }
+
+        input[type="text"], input[type="password"] { width: 100%; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); outline: none; font-size: 0.9rem; }
+        input[type="text"]:focus, input[type="password"]:focus { border-color: var(--accent); }
+
+        .btn-primary { width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        /* APP LAYOUT */
+        #app-screen { display: none; width: 100vw; height: 100vh; flex-direction: row; }
+
+        .chat-sidebar { width: 320px; min-width: 320px; background-color: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; position: relative; z-index: 10; }
+        .sidebar-header { padding: 12px 15px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .sidebar-header h4 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .chat-container { flex: 1; display: flex; flex-direction: column; background: var(--bg-dark); position: relative; min-height: 0; }
+        #log { flex: 1; padding: 10px; overflow-y: auto; overflow-x: visible; font-size: 0.85rem; display: flex; flex-direction: column; gap: 6px; word-break: break-word; }
+        
+        .system-msg { background: rgba(255,255,255,0.02); padding: 4px 8px; border-radius: 4px; color: var(--text-muted); font-size: 0.8rem; border-left: 3px solid var(--text-muted); margin-bottom: 2px; }
+        .chat-msg { display: flex; gap: 10px; align-items: flex-start; padding: 4px 6px; border-radius: 4px; position: relative; transition: background-color 0.5s ease; margin-bottom: 0px; }
+        .chat-msg:hover { background: rgba(255,255,255,0.02); }
+        .chat-msg:hover .msg-actions { display: flex; }
+        .chat-msg.highlighted { background: rgba(16, 185, 129, 0.25) !important; }
+
+        .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; color: white; cursor: pointer; }
+        .msg-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .msg-content { flex: 1; min-width: 0; }
+        .msg-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }
+        .msg-username { font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
+        
+        .reply-reference { font-size: 0.75rem; color: var(--text-muted); border-left: 2px solid var(--accent); padding-left: 6px; margin-bottom: 2px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; user-select: none; }
+        .reply-reference:hover { color: var(--text-main); opacity: 1; }
+
+        .msg-text { color: var(--text-main); font-size: 0.85rem; white-space: pre-wrap; margin-bottom: 0; }
+        .msg-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+        .msg-reactions:empty { display: none; }
+        .reaction-badge { display: inline-flex; align-items: center; gap: 4px; background: #212529; border: 1px solid var(--border); border-radius: 12px; padding: 2px 6px; font-size: 0.75rem; cursor: pointer; color: var(--text-main); }
+        .reaction-badge.reacted { background: rgba(16, 185, 129, 0.15); border-color: var(--accent); color: var(--accent); }
+
+        .msg-actions { display: none; position: absolute; right: 10px; top: -14px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; overflow: visible; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+        .msg-action-btn { background: transparent; border: none; color: var(--text-muted); padding: 5px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .msg-action-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-main); }
+        .msg-action-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+        .reaction-picker-popover { display: none; position: fixed; width: 184px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; grid-template-columns: repeat(4, 1fr); gap: 5px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .reaction-picker-popover.active { display: grid; }
+        .reaction-picker-popover span { font-size: 1.2rem; cursor: pointer; padding: 4px; text-align: center; border-radius: 4px; }
+        .reaction-picker-popover span:hover { background: rgba(255,255,255,0.05); }
+
+        .chat-msg img.media-preview { max-width: 100%; border-radius: 6px; margin-top: 4px; max-height: 200px; object-fit: contain; display: block; cursor: pointer; }
+
+        .file-card { display: flex; align-items: center; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; gap: 10px; margin-top: 4px; max-width: 260px; }
+        .file-icon { width: 32px; height: 32px; background: var(--accent); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white; }
+        .file-icon svg { width: 18px; height: 18px; fill: currentColor; }
+        .file-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 1px; }
+        .file-name { font-weight: 600; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+        .file-size { font-size: 0.72rem; color: var(--text-muted); }
+        .file-download-btn { background: #374151; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; text-decoration: none; font-weight: 600; display: inline-block; margin-top: 2px; align-self: flex-start; }
+        .file-download-btn:hover { background: #4b5563; }
+
+        .typing-indicator { font-size: 0.75rem; color: var(--text-muted); padding: 0 10px 2px 10px; min-height: 16px; font-style: italic; }
+        #reply-bar { display: none; background: #222529; border-top: 1px solid var(--border); padding: 6px 12px; font-size: 0.75rem; color: var(--text-muted); align-items: center; justify-content: space-between; }
+        #reply-bar button { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
+
+        .chat-input-area { display: flex; padding: 8px; background: var(--bg-panel); gap: 6px; align-items: flex-end; position: relative; z-index: 10; border-top: 1px solid var(--border); }
+        .chat-input-area textarea { margin: 0; flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--text-main); padding: 8px 10px; outline: none; resize: none; min-height: 38px; max-height: 120px; line-height: 20px; font-size: 0.9rem; overflow-y: auto; }
+        .chat-input-area textarea:focus { border-color: var(--accent); }
+        
+        .icon-btn { background: #2a2e33; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; border: none; padding: 0; transition: background 0.2s, color 0.2s; flex-shrink: 0; }
+        .icon-btn:hover { background: #374151; color: var(--text-main); }
+        .icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+        .send-icon-btn { background: var(--accent); color: white; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; padding: 0; flex-shrink: 0; }
+        .send-icon-btn:hover { background: var(--accent-hover); }
+        .send-icon-btn:disabled { background: #2a2e33; color: var(--text-muted); cursor: not-allowed; }
+        .send-icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+        #emoji-picker { display: none; position: absolute; bottom: 58px; left: 10px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; grid-template-columns: repeat(4, 1fr); gap: 5px; z-index: 300; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        #emoji-picker.active { display: grid; }
+        #emoji-picker span { font-size: 1.2rem; cursor: pointer; padding: 4px; text-align: center; border-radius: 4px; }
+        #emoji-picker span:hover { background: rgba(255,255,255,0.05); }
+
+        /* CENTER STAGE */
+        .main-stage { flex: 1; display: flex; flex-direction: column; height: 100vh; min-width: 0; background: #111315; position: relative; }
+        .stage-header { padding: 10px 16px; background: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; z-index: 5; }
+        .lobby-title-wrap { display: flex; align-items: center; gap: 10px; }
+        .lobby-title-wrap h3 { font-size: 1.05rem; color: var(--text-main); }
+        
+        .stage-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-invite { background: var(--accent); color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .btn-invite:hover { background: var(--accent-hover); }
+        .btn-exit { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid var(--danger); padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .btn-exit:hover { background: var(--danger); color: white; }
+        .btn-action-sm { background: #2a2e33; color: var(--text-main); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .btn-action-sm:hover { background: #374151; }
+
+        .video-grid { flex: 1; padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-content: center; justify-content: center; overflow-y: auto; min-height: 0; }
+        .video-grid.focused-layout { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+        .video-grid.focused-layout .stage-card:not(.focused) { display: none; }
+
+        .stage-card { position: relative; background: var(--bg-panel); border-radius: 12px; overflow: hidden; border: 2px solid var(--border); aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color 0.15s ease; }
+        .stage-card.speaking { border-color: var(--accent) !important; box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
+        .stage-card.focused { aspect-ratio: unset; height: 100%; width: 100%; }
+        .stage-card:fullscreen, .stage-card:-webkit-full-screen { width: 100vw; height: 100vh; max-width: none; max-height: none; aspect-ratio: auto; border: 0; border-radius: 0; background: #000; cursor: default; }
+
+        .stage-avatar-view { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 100%; background: var(--bg-card); }
+        .stage-avatar-circle { width: 90px; height: 90px; border-radius: 50%; background: var(--accent); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: bold; color: white; border: 3px solid var(--border); }
+        .stage-avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+        video { width: 100%; height: 100%; object-fit: contain; background: #000; display: none; }
+        video.active { display: block; }
+
+        .video-label { position: absolute; bottom: 10px; left: 10px; background: rgba(0, 0, 0, 0.75); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; color: white; pointer-events: none; display: flex; align-items: center; gap: 6px; }
+        .fullscreen-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 4px; padding: 5px; cursor: pointer; display: none; }
+        .stage-card:hover .fullscreen-btn { display: block; }
+        .fullscreen-controls { position: absolute; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; background: rgba(18,20,22,0.88); opacity: 0; pointer-events: none; transition: opacity 0.18s ease; }
+        .stage-card:fullscreen .fullscreen-controls, .stage-card:-webkit-full-screen .fullscreen-controls { display: flex; }
+        .stage-card.controls-visible .fullscreen-controls { opacity: 1; pointer-events: auto; }
+        .stage-card:fullscreen .fullscreen-btn, .stage-card:-webkit-full-screen .fullscreen-btn { display: none !important; }
+        .fullscreen-controls button { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 6px; color: white; background: #34383d; cursor: pointer; }
+        .fullscreen-controls button:hover { background: var(--danger); }
+        .fullscreen-controls button svg { width: 18px; height: 18px; fill: currentColor; }
+        .fullscreen-volume { display: flex; align-items: center; gap: 8px; width: 180px; }
+        .fullscreen-volume svg { flex: 0 0 auto; width: 17px; height: 17px; fill: #fff; }
+        .fullscreen-volume input { min-width: 0; }
+        .member-status-icons .status-muted, .member-status-icons .status-deafened { color: var(--danger); }
+        .member-status-icons .status-muted line, .member-status-icons .status-deafened line { stroke: currentColor; }
+
+        /* CONTROL BAR */
+        .control-bar { padding: 12px; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 12px; flex-shrink: 0; z-index: 10; }
+        .control-btn { width: 44px; height: 44px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: #2a2e33; border: none; cursor: pointer; color: white; transition: background 0.2s; }
+        .control-btn:hover { background: #374151; }
+        .control-btn.active { background: var(--danger); }
+        .control-btn.active:hover { background: var(--danger-hover); }
+        .control-btn.noise-active { background: var(--accent); color: white; }
+        .control-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+        /* RIGHT MEMBER LIST SIDEBAR */
+        .right-sidebar { width: 260px; min-width: 260px; background-color: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; gap: 12px; height: 100%; position: relative; z-index: 10; }
+        .right-sidebar h4 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .member-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; margin-bottom: 2px; cursor: pointer; }
+        .member-item:hover { background: rgba(255,255,255,0.04); }
+        .member-item.speaking .member-avatar { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .member-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; color: white; flex-shrink: 0; overflow: hidden; }
+        .member-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .member-name { font-size: 0.88rem; color: var(--text-main); font-weight: 500; display: flex; align-items: center; gap: 6px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .member-status-icons { display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
+        .member-status-icons svg { width: 14px; height: 14px; fill: currentColor; }
+
+        /* MODALS & POPOVERS */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 6000; align-items: center; justify-content: center; }
+        .modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.8); position: relative; }
+        .modal-card h3 { font-size: 1.2rem; color: var(--text-main); text-align: center; }
+        .modal-card p { font-size: 0.82rem; color: var(--text-muted); text-align: center; margin-top: -8px; }
+        .notice-card { align-items: center; max-width: 360px; }
+        .notice-card .btn-primary { margin-top: 2px; }
+        .notice-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--accent); background: rgba(16, 185, 129, 0.12); font-weight: 800; font-size: 1.2rem; }
+        #notice-modal { z-index: 9000; }
+        
+        #qrcode-container { background: white; padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto; width: fit-content; }
+        
+        .copy-input-group { display: flex; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; padding: 4px 6px; align-items: center; }
+        .copy-input-group input { background: transparent; border: none; color: var(--text-main); font-size: 0.8rem; flex: 1; outline: none; padding: 4px; }
+        .copy-icon-btn { background: var(--accent); border: none; color: white; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .copy-icon-btn:hover { background: var(--accent-hover); }
+        .copy-icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+        .modal-close-link { text-align: center; font-size: 0.85rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; margin-top: -4px; }
+        .modal-close-link:hover { color: var(--text-main); }
+
+        /* User Control Popover */
+        #user-control-popover { display: none; position: fixed; width: min(280px, calc(100vw - 16px)); background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; z-index: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+        .card-header-banner { height: 45px; background: var(--bg-card); position: relative; }
+        .card-avatar-wrapper { position: absolute; bottom: -20px; left: 16px; width: 52px; height: 52px; border-radius: 50%; background: var(--bg-card); padding: 3px; cursor: pointer; }
+        .card-avatar { width: 100%; height: 100%; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1.1rem; overflow: hidden; position: relative; }
+        .card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Edit icon overlay on avatar hover */
+        .avatar-edit-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; color: white; }
+        .card-avatar-wrapper:hover .avatar-edit-overlay { opacity: 1; }
+
+        .card-body { padding: 26px 16px 16px 16px; }
+        .card-username { font-weight: 700; font-size: 1rem; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        .card-profile-subtitle { color: var(--text-muted); font-size: 0.75rem; line-height: 1.45; margin: -6px 0 14px; }
+        .profile-field-label { color: var(--text-muted); display: block; font-size: 0.68rem; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; }
+        .widget-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 0.82rem; color: var(--text-muted); }
+
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #374151; transition: .2s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .2s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        /* Crop Canvas Modal */
+        #crop-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 7000; align-items: center; justify-content: center; }
+        .crop-card { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .crop-card canvas { border-radius: 50%; border: 2px solid var(--accent); width: 300px; height: 300px; cursor: crosshair; background: #000; }
+
+        .modern-range { width: 100%; height: 6px; border-radius: 999px; appearance: none; background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--range-progress, 50%), #374151 var(--range-progress, 50%), #374151 100%); cursor: pointer; }
+        .modern-range::-webkit-slider-thumb { width: 16px; height: 16px; appearance: none; border: 2px solid white; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+        .modern-range::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+
+        @media (max-width: 760px) {
+            body { height: 100dvh; width: 100%; overflow: hidden; }
+            #app-screen { height: 100dvh; flex-direction: column; }
+            .main-stage { order: 0; flex: 1 1 50%; min-height: 250px; width: 100%; height: auto; }
+            .chat-sidebar { order: 1; flex: 1 1 34%; min-height: 180px; width: 100%; min-width: 0; height: auto; border-right: 0; border-top: 1px solid var(--border); }
+            .right-sidebar { order: 2; flex: 0 0 16%; min-height: 96px; width: 100%; min-width: 0; height: auto; padding: 8px 12px; border-left: 0; border-top: 1px solid var(--border); gap: 6px; }
+            .right-sidebar h4 { font-size: 0.72rem; }
+            #peer-list { display: flex; gap: 4px; overflow-x: auto !important; overflow-y: hidden !important; }
+            .member-item { flex: 0 0 auto; padding: 4px 6px; margin: 0; }
+            .stage-header { padding: 8px 10px; gap: 8px; }
+            .lobby-title-wrap { min-width: 0; }
+            .lobby-title-wrap h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .stage-actions { gap: 5px; }
+            .btn-invite, .btn-exit { padding: 6px 8px; font-size: 0.75rem; }
+            .btn-invite svg, .btn-exit svg { display: none; }
+            .video-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); padding: 10px; gap: 8px; }
+            .stage-card { border-radius: 8px; }
+            .control-bar { padding: 8px; gap: 10px; }
+            .control-btn { width: 38px; height: 38px; }
+            #log { padding: 8px; }
+            .msg-actions { display: flex; top: 2px; right: 4px; }
+            .chat-msg { padding-right: 98px; }
+            .msg-action-btn { padding: 6px; }
+            .modal-card { width: calc(100% - 24px); padding: 18px; }
+            .crop-card { width: calc(100% - 24px); }
+            .crop-card canvas { width: min(72vw, 300px); height: min(72vw, 300px); }
+        }
+
+        @media (max-width: 420px) {
+            #lobby-screen { padding: 12px; overflow-y: auto; }
+            .lobby-card { padding: 20px; gap: 13px; }
+            .lobby-card h1 { font-size: 1.3rem; }
+            .profile-setup { grid-template-columns: 56px minmax(0, 1fr); gap: 10px 12px; padding-bottom: 16px; }
+            .avatar-picker { width: 56px; height: 56px; }
+            .lobby-join-btn { padding: 0 12px; }
+            .stage-header { align-items: flex-start; }
+            .stage-actions { flex-wrap: wrap; justify-content: flex-end; }
+            .btn-exit { font-size: 0; }
+            .btn-exit svg { display: block; }
+            .control-bar { gap: 7px; }
+            .control-btn { width: 34px; height: 34px; }
+        }
+
+        /* Lightbox Modal */
+        #lightbox-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 8000; align-items: center; justify-content: center; cursor: zoom-out; }
+        #lightbox-modal img { max-width: 90vw; max-height: 90vh; border-radius: 8px; object-fit: contain; }
+    </style>
 </head>
-<body class="bg-discord-darker text-gray-100 h-screen flex flex-col overflow-hidden font-sans">
+<body>
 
-    <!-- LANDING / LOBBY SELECTION VIEW -->
-    <div id="landing-view" class="flex-1 flex items-center justify-center p-6 bg-discord-darker overflow-y-auto">
-        <div class="bg-discord-dark max-w-md w-full p-8 rounded-2xl shadow-2xl border border-gray-700/50 flex flex-col gap-6 my-auto">
-            <div class="text-center">
-                <h1 class="text-3xl font-bold tracking-tight text-white mb-2">P2P Rooms</h1>
-                <p class="text-gray-400 text-sm">Secure, decentralized voice, video & screen sharing.</p>
+    <!-- LOBBY INITIAL SCREEN -->
+    <div id="lobby-screen">
+        <div class="lobby-card">
+            <h1>P2P Rooms</h1>
+            <p class="lobby-subtitle">Secure, decentralized voice, video &amp; screen sharing.</p>
+            <div class="lobby-section-label">Your profile &amp; avatar</div>
+            <div class="profile-setup">
+                <div class="avatar-picker" id="lobby-avatar-preview" onclick="document.getElementById('avatar-file-input').click()" title="Click to choose avatar">
+                    <span id="lobby-avatar-initial">U</span>
+                </div>
+                <input type="file" id="avatar-file-input" accept="image/*" style="display: none;" onchange="handleAvatarSelect(event)">
+                <input type="text" id="lobby-username-input" aria-label="Your username" placeholder="Your username" oninput="updateAvatarUI()">
+                <span class="profile-hint">Avatar defaults to the first letter of your username or a custom uploaded image.</span>
             </div>
 
-            <!-- User Profile Setup -->
-            <div class="flex flex-col gap-3">
-                <label class="text-xs font-bold uppercase tracking-wider text-gray-400">Your Profile & Avatar</label>
-                <div class="flex gap-4 items-center">
-                    <div id="avatar-preview-container" class="relative group w-16 h-16 rounded-full bg-discord-accent text-white flex items-center justify-center text-2xl font-bold cursor-pointer overflow-hidden shadow-inner">
-                        <span id="avatar-display">U</span>
-                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs text-white font-medium">Upload</div>
-                        <input type="file" id="avatar-file-input" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
-                    </div>
-                    <div class="flex-1 flex flex-col gap-2">
-                        <input type="text" id="username-input" placeholder="Enter username..." class="bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                        <span class="text-[11px] text-gray-400">Avatar defaults to the first letter of your username or custom uploaded image.</span>
-                    </div>
-                </div>
+            <div class="lobby-section-label">Create a new lobby</div>
+            <input type="text" id="create-name-input" aria-label="Lobby name" placeholder="Lobby Name">
+            <input type="password" id="create-pass-input" aria-label="Lobby password" placeholder="Password (Optional)">
+            <button class="btn-primary lobby-create-btn" onclick="submitCreateLobby()">Create Lobby</button>
+
+            <div class="lobby-divider">Or join</div>
+            <div class="lobby-section-label">Join via invite code</div>
+            <div class="lobby-join-row">
+                <input type="text" id="join-code-input" aria-label="Invite code" placeholder="Enter Invite Code">
+                <button class="lobby-join-btn" onclick="submitJoinLobby()">Join</button>
             </div>
-
-            <hr class="border-gray-700/50">
-
-            <!-- Tabs / Actions -->
-            <div class="flex flex-col gap-4">
-                <!-- Create Lobby -->
-                <div class="flex flex-col gap-2">
-                    <h2 class="text-sm font-semibold text-gray-300">Create a New Lobby</h2>
-                    <input type="text" id="create-lobby-name" placeholder="Lobby Name" class="bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                    <input type="password" id="create-lobby-pass" placeholder="Password (Optional)" class="bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                    <button id="create-lobby-btn" class="bg-discord-accent hover:bg-discord-accentHover text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm">Create Lobby</button>
-                </div>
-
-                <div class="flex items-center my-1">
-                    <div class="flex-1 border-t border-gray-700"></div>
-                    <span class="px-3 text-xs text-gray-500 uppercase">or join</span>
-                    <div class="flex-1 border-t border-gray-700"></div>
-                </div>
-
-                <!-- Join Code / Invite -->
-                <div class="flex flex-col gap-2">
-                    <h2 class="text-sm font-semibold text-gray-300">Join via Invite Code</h2>
-                    <div class="flex gap-2">
-                        <input type="text" id="join-code-input" placeholder="Enter Invite Code" class="flex-1 bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                        <button id="join-code-btn" class="bg-discord-green hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm">Join</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- History -->
-            <div id="history-section" class="flex flex-col gap-2 hidden">
-                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-400">Recent Lobbies</h2>
-                <div id="history-list" class="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1"></div>
-            </div>
+            <input type="password" id="join-pass-input" aria-label="Room password" placeholder="Room password (if required)">
         </div>
     </div>
 
-    <!-- ROOM VIEW -->
-    <div id="room-view" class="flex-1 flex hidden overflow-hidden">
+    <!-- MAIN APP SCREEN -->
+    <div id="app-screen">
         
-        <!-- Main Content (Video / Stream Grid) -->
-        <div class="flex-1 flex flex-col bg-discord-dark relative">
-            <!-- Top Bar -->
-            <div class="h-14 border-b border-gray-700/50 flex items-center justify-between px-6 bg-discord-darker/50">
-                <div class="flex items-center gap-3">
-                    <span id="room-title-display" class="font-bold text-lg text-white">Lobby</span>
+        <!-- Left Chat Sidebar -->
+        <div class="chat-sidebar">
+            <div class="sidebar-header">
+                <h4>Messages</h4>
+            </div>
+
+            <div class="chat-container">
+                <div id="log"><div class="system-msg"><em>Connecting to mesh network...</em></div></div>
+                
+                <div class="typing-indicator" id="typing-indicator"></div>
+
+                <div id="emoji-picker">
+                    <span onclick="insertEmoji('😀')">😀</span><span onclick="insertEmoji('😂')">😂</span>
+                    <span onclick="insertEmoji('❤️')">❤️</span><span onclick="insertEmoji('👍')">👍</span>
+                    <span onclick="insertEmoji('🔥')">🔥</span><span onclick="insertEmoji('🎉')">🎉</span>
+                    <span onclick="insertEmoji('🚀')">🚀</span><span onclick="insertEmoji('👀')">👀</span>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button id="share-invite-btn" class="bg-discord-accent hover:bg-discord-accentHover text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition">
-                        <i class="fa-solid fa-user-plus"></i> Invite
+
+                <div id="reply-bar">
+                    <span id="reply-target-text">Replying to...</span>
+                    <button onclick="cancelReply()">✕</button>
+                </div>
+
+                <div class="chat-input-area">
+                    <input type="file" id="file-input" style="display: none;" onchange="handleFileUpload(event)">
+                    <button class="icon-btn" onclick="document.getElementById('file-input').click()" title="Attach File">
+                        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                     </button>
-                    <button id="exit-room-btn" class="bg-discord-red/20 hover:bg-discord-red text-discord-red hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition">
-                        <i class="fa-solid fa-arrow-right-from-bracket"></i> Exit Lobby
+                    <button class="icon-btn" id="emoji-btn" onclick="toggleEmojiPicker()" title="Insert Emoji">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 14s1.5 2 4 2 4-2 4-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                    </button>
+                    <textarea id="message-input" placeholder="Message room..." rows="1" oninput="autoResizeTextarea(this)" onkeydown="handleMessageKeyDown(event)"></textarea>
+                    <button id="send-btn" class="send-icon-btn" title="Send Message">
+                        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                     </button>
                 </div>
             </div>
+        </div>
 
-            <!-- Video / Media Grid Area -->
-            <div id="media-grid" class="flex-1 p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto items-center justify-center">
-                <!-- Dynamic Tiles injected here -->
+        <!-- Center Main Stage -->
+        <div class="main-stage">
+            <div class="stage-header">
+                <div class="lobby-title-wrap">
+                    <h3 id="display-room-name">Lobby</h3>
+                </div>
+                <div class="stage-actions">
+                    <button class="btn-invite" onclick="openInviteModal()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+                        Invite
+                    </button>
+                    <button class="btn-exit" onclick="exitLobby()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+                        Exit Lobby
+                    </button>
+                    <button class="btn-action-sm" id="host-settings-btn" style="display: none;" onclick="openHostSettingsModal()">Manage</button>
+                </div>
             </div>
 
-            <!-- Control Bar (Bottom Floating/Fixed) -->
-            <div class="h-20 bg-discord-darker flex items-center justify-center gap-4 px-6 border-t border-gray-700/50">
-                <button id="toggle-mic" class="w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg relative" title="Toggle Mic">
-                    <i class="fa-solid fa-microphone"></i>
+            <!-- Video Grid -->
+            <div class="video-grid" id="video-grid"></div>
+
+            <!-- Bottom Controls -->
+            <div class="control-bar">
+                <button id="mic-btn" class="control-btn active" title="Toggle Microphone">
+                    <svg id="mic-icon-off" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.27-1.48.42-2.31.42-2.76 0-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c1.39-.2 2.66-.78 3.68-1.61l3.05 3.05 1.27-1.27L4.27 3z"/></svg>
+                    <svg id="mic-icon-on" viewBox="0 0 24 24" style="display: none;"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
                 </button>
-                <button id="toggle-cam" class="w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg" title="Toggle Camera">
-                    <i class="fa-solid fa-video"></i>
+                <button id="deafen-btn" class="control-btn active" title="Toggle Deafen">
+                    <svg id="deafen-icon-off" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-9 9v7c0 1.1.9 2 2 2h3v-8H5v-1a7 7 0 0 1 14 0v1h-3v8h3c1.1 0 2-.9 2-2v-7a9 9 0 0 0-9-9z"/><line x1="4" y1="4" x2="20" y2="20" stroke="white" stroke-width="2.5"/></svg>
+                    <svg id="deafen-icon-on" viewBox="0 0 24 24" style="display: none;"><path d="M12 3a9 9 0 0 0-9 9v7c0 1.1.9 2 2 2h3v-8H5v-1a7 7 0 0 1 14 0v1h-3v8h3c1.1 0 2-.9 2-2v-7a9 9 0 0 0-9-9z"/></svg>
                 </button>
-                <button id="toggle-screen" class="w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg" title="Share Screen">
-                    <i class="fa-solid fa-desktop"></i>
+                <button id="webcam-btn" class="control-btn" title="Toggle Camera">
+                    <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                </button>
+                <button id="screen-btn" class="control-btn" title="Share Screen">
+                    <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.11-.9-2-2-2H4c-1.11 0-2 .89-2 2v10c0 1.1.89 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                </button>
+                <button id="noise-btn" class="control-btn noise-active" title="Toggle Noise Suppression" onclick="toggleNoiseSuppression()">
+                    <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                 </button>
             </div>
         </div>
 
-        <!-- Right Sidebar (Occupies Full Right Column: Members List + Chat Window) -->
-        <div class="w-80 bg-discord-sidebar border-l border-gray-700/50 flex flex-col h-full">
-            <!-- Room Members Section -->
-            <div class="h-12 border-b border-gray-700/50 flex items-center px-4 font-bold text-xs tracking-wider uppercase text-gray-400">
-                Room Members (<span id="member-count">0</span>)
+        <!-- Right Member List Sidebar (Scrollable) -->
+        <div class="right-sidebar">
+            <h4 id="member-count-header">Lobby Members (0)</h4>
+            <div id="peer-list" style="flex: 1; overflow-y: auto; overflow-x: hidden;"></div>
+        </div>
+    </div>
+
+    <!-- Global Reaction Emoji Picker Popover -->
+    <div class="reaction-picker-popover" id="global-reaction-picker">
+        <span onclick="submitReaction('😀')">😀</span><span onclick="submitReaction('😂')">😂</span>
+        <span onclick="submitReaction('❤️')">❤️</span><span onclick="submitReaction('👍')">👍</span>
+        <span onclick="submitReaction('🔥')">🔥</span><span onclick="submitReaction('🎉')">🎉</span>
+        <span onclick="submitReaction('🚀')">🚀</span><span onclick="submitReaction('👀')">👀</span>
+    </div>
+
+    <div class="modal-overlay" id="notice-modal" role="dialog" aria-modal="true" aria-labelledby="notice-title">
+        <div class="modal-card notice-card">
+            <div class="notice-mark" aria-hidden="true">!</div>
+            <h3 id="notice-title">Notice</h3>
+            <p id="notice-message"></p>
+            <button class="btn-primary" id="notice-confirm-btn" onclick="closeNotice()">Got it</button>
+        </div>
+    </div>
+
+    <!-- Custom Modal Popup for File Size Warning -->
+    <div class="modal-overlay" id="file-warning-modal" onclick="if(event.target === this) closeFileWarningModal()">
+        <div class="modal-card">
+            <h3>File Too Large</h3>
+            <p style="color: var(--text-main); text-align: center; margin: 6px 0;">Files larger than 50 MB cannot be transmitted over P2P data channels safely.</p>
+            <button class="btn-primary" onclick="closeFileWarningModal()">Got It</button>
+        </div>
+    </div>
+
+    <!-- Invite Modal -->
+    <div class="modal-overlay" id="invite-modal" onclick="if(event.target === this) closeInviteModal()">
+        <div class="modal-card">
+            <h3>Invite Friends</h3>
+            <p>Scan QR code or copy invite link below.</p>
+            <div id="qrcode-container"></div>
+            <div class="copy-input-group">
+                <input type="text" id="invite-url-input" readonly>
+                <button class="copy-icon-btn" onclick="copyInviteUrl()" title="Copy Link">
+                    <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
             </div>
-            <div id="members-list" class="max-h-48 overflow-y-auto p-2 flex flex-col gap-1 border-b border-gray-700/50">
-                <!-- Members listed here -->
+            <div class="modal-close-link" onclick="closeInviteModal()">Close</div>
+        </div>
+    </div>
+
+    <!-- Host Settings Modal -->
+    <div class="modal-overlay" id="host-modal" onclick="if(event.target === this) closeHostSettingsModal()">
+        <div class="modal-card">
+            <h3>Lobby Settings</h3>
+            <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Change Lobby Name</label>
+                <input type="text" id="edit-room-name-input">
             </div>
-
-            <!-- Chat Window Section -->
-            <div class="flex-1 flex flex-col min-h-0 bg-discord-darker/30">
-                <div class="h-10 px-4 flex items-center border-b border-gray-700/30 text-xs font-bold uppercase tracking-wider text-gray-400">
-                    Room Chat
-                </div>
-                <!-- Chat Messages -->
-                <div id="chat-messages" class="flex-1 p-3 overflow-y-auto flex flex-col gap-3 text-sm">
-                    <!-- Messages injected here -->
-                </div>
-
-                <!-- Reply Preview Box -->
-                <div id="reply-preview-container" class="hidden px-3 py-1.5 bg-discord-dark border-t border-gray-700 flex items-center justify-between text-xs text-gray-400">
-                    <div id="reply-preview-text" class="truncate">Replying to user...</div>
-                    <button id="cancel-reply-btn" class="hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-
-                <!-- Chat Input Form -->
-                <div class="p-3 bg-discord-dark border-t border-gray-700/50">
-                    <form id="chat-form" class="flex gap-2">
-                        <input type="text" id="chat-input" placeholder="Message #lobby..." class="flex-1 bg-discord-input border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                        <button type="submit" class="bg-discord-accent hover:bg-discord-accentHover text-white px-3 py-2 rounded-lg text-sm transition">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
-                    </form>
-                </div>
+            <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Change Password</label>
+                <input type="password" id="edit-room-pass-input" placeholder="Leave empty for no password">
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button class="btn-action-sm" onclick="closeHostSettingsModal()">Cancel</button>
+                <button class="btn-primary" style="width: auto; padding: 6px 14px;" onclick="saveHostSettings()">Save Changes</button>
             </div>
         </div>
     </div>
 
-    <!-- PROFILE MODAL (Click on any profile) -->
-    <div id="profile-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
-        <div class="bg-discord-dark p-6 rounded-2xl max-w-sm w-full border border-gray-700 flex flex-col items-center gap-4 text-center relative">
-            <button id="close-profile-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <div id="modal-profile-avatar" class="w-24 h-24 rounded-full bg-discord-accent text-white border-2 border-discord-accent flex items-center justify-center text-3xl font-bold overflow-hidden shadow-lg">
-                U
-            </div>
-            <div class="flex flex-col gap-1">
-                <h3 id="modal-profile-name" class="text-xl font-bold text-white">Username</h3>
-                <div id="modal-profile-badges" class="flex gap-2 justify-center mt-1">
-                    <!-- Badges for Host, Muted, etc. -->
+    <!-- User Control Popover -->
+    <div id="user-control-popover">
+        <div class="card-header-banner">
+            <div class="card-avatar-wrapper" onclick="openLightboxFromCard()">
+                <div class="card-avatar" id="card-avatar-el">
+                    <div class="avatar-edit-overlay" id="card-edit-overlay" style="display: none;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    </div>
+                    U
                 </div>
             </div>
-            <p id="modal-profile-desc" class="text-xs text-gray-400">Connected peer in current P2P mesh network.</p>
+        </div>
+        <div class="card-body">
+            <div class="card-username" id="card-username-el">User</div>
+            <p class="card-profile-subtitle" id="card-profile-subtitle"></p>
+            <div class="widget-row" id="mute-widget-row">
+                <span>Mute Audio</span>
+                <label class="switch">
+                    <input type="checkbox" id="user-mute-checkbox" onchange="toggleUserMute(this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="widget-row" id="vol-widget-row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <span>User Volume</span>
+                    <span id="vol-percentage">100%</span>
+                </div>
+                <input type="range" class="modern-range" id="user-volume-slider" min="0" max="2" step="0.01" value="1" oninput="changeUserVolume(this.value)">
+            </div>
+            <button class="kick-btn" id="kick-user-btn" onclick="kickActiveTargetUser()" style="width:100%; padding:6px; background:var(--danger); color:white; border:none; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.8rem; margin-top:8px; display:none;">Kick User</button>
         </div>
     </div>
 
-    <!-- PASSWORD MODAL -->
-    <div id="password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
-        <div class="bg-discord-dark p-6 rounded-2xl max-w-sm w-full border border-gray-700 flex flex-col gap-4">
-            <h3 class="text-lg font-bold text-white">Enter Lobby Password</h3>
-            <p class="text-xs text-gray-400">This lobby is password protected.</p>
-            <input type="password" id="modal-password-input" placeholder="Password..." class="bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-            <div class="flex justify-end gap-2 mt-2">
-                <button id="cancel-password-btn" class="px-4 py-2 rounded-lg bg-gray-700 text-sm font-medium hover:bg-gray-600">Cancel</button>
-                <button id="submit-password-btn" class="px-4 py-2 rounded-lg bg-discord-accent text-sm font-medium hover:bg-discord-accentHover">Join</button>
+    <!-- Crop Canvas Modal -->
+    <div id="crop-modal">
+        <div class="crop-card">
+            <h3 style="font-size: 1.1rem; color: var(--text-main);">Crop Profile Picture</h3>
+            <canvas id="crop-canvas" width="1200" height="1200"></canvas>
+            <div style="display: flex; flex-direction: column; width: 100%; gap: 4px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Zoom</label>
+                <input type="range" class="modern-range" id="crop-zoom-slider" min="0.1" max="4" step="0.05" value="1" oninput="updateCropZoom(this.value)">
+            </div>
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <button onclick="cancelCrop()" style="flex:1; padding: 9px; background: #374151; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Cancel</button>
+                <button onclick="confirmCrop()" style="flex:1; padding: 9px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Confirm</button>
             </div>
         </div>
     </div>
 
-    <!-- INVITE POPUP MODAL -->
-    <div id="invite-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
-        <div class="bg-discord-dark p-6 rounded-2xl max-w-md w-full border border-gray-700 flex flex-col items-center gap-4 text-center">
-            <h3 class="text-lg font-bold text-white">Invite Friends</h3>
-            <p class="text-xs text-gray-400">Scan QR code or copy invite link below.</p>
-            <div class="bg-white p-3 rounded-xl">
-                <img id="invite-qr-code" src="" alt="QR Code" class="w-40 h-40 object-contain">
-            </div>
-            <div class="flex w-full gap-2 mt-2">
-                <input type="text" id="invite-url-input" readonly class="flex-1 bg-discord-darker border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none">
-                <button id="copy-invite-btn" class="bg-discord-accent hover:bg-discord-accentHover text-white px-4 py-2 rounded-lg text-xs font-medium transition">Copy</button>
-            </div>
-            <button id="close-invite-modal" class="mt-2 text-xs text-gray-400 hover:text-white underline">Close</button>
-        </div>
+    <!-- Lightbox Modal -->
+    <div id="lightbox-modal" onclick="closeLightbox()">
+        <img id="lightbox-img" src="" alt="Fullscreen view">
     </div>
 
-    <!-- APPLICATION LOGIC -->
+    <!-- PeerJS CDN -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script>
-        // State
-        let peer = null;
-        let myPeerId = null;
-        let myStream = null;
-        let screenStream = null;
-        let activeConnections = {}; // peerId -> { conn, call, stream, username, avatar, isScreen, micMuted }
-        let peersInRoom = {}; // peerId -> { username, avatar, isHost, micMuted }
-        let myUsername = "User_" + Math.floor(Math.random() * 1000);
-        let myAvatar = ""; // Custom uploaded image URL or empty to use letter avatar
-        let isHost = false;
-        let currentLobbyId = null;
-        let currentLobbyName = "";
-        let lobbyPassword = "";
-        let pendingJoinLobbyId = null;
-        let replyingTo = null; // { id, username, text }
+        window.addEventListener('contextmenu', e => e.preventDefault());
 
-        // DOM Elements
-        const landingView = document.getElementById('landing-view');
-        const roomView = document.getElementById('room-view');
-        const usernameInput = document.getElementById('username-input');
-        const avatarDisplay = document.getElementById('avatar-display');
-        const avatarFileInput = document.getElementById('avatar-file-input');
-        const createLobbyNameInput = document.getElementById('create-lobby-name');
-        const createLobbyPassInput = document.getElementById('create-lobby-pass');
-        const createLobbyBtn = document.getElementById('create-lobby-btn');
+        if (sessionStorage.getItem('p2p_kicked_banned') === 'true') {
+            document.body.innerHTML = `<div style="display:flex; height:100vh; width:100vw; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:#ef4444; font-family:sans-serif;"><h2>You have been kicked from this room instance.</h2></div>`;
+            throw new Error("Kicked session banned.");
+        }
+
+        /* Elements */
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const appScreen = document.getElementById('app-screen');
+        const lobbyUsernameInput = document.getElementById('lobby-username-input');
+        const lobbyAvatarPreview = document.getElementById('lobby-avatar-preview');
+        const lobbyAvatarInitial = document.getElementById('lobby-avatar-initial');
         const joinCodeInput = document.getElementById('join-code-input');
-        const joinCodeBtn = document.getElementById('join-code-btn');
-        const historySection = document.getElementById('history-section');
-        const historyList = document.getElementById('history-list');
+        const joinPassInput = document.getElementById('join-pass-input');
+        const createNameInput = document.getElementById('create-name-input');
+        const createPassInput = document.getElementById('create-pass-input');
+
+        const displayRoomName = document.getElementById('display-room-name');
+        const hostSettingsBtn = document.getElementById('host-settings-btn');
+        const peerListEl = document.getElementById('peer-list');
+        const memberCountHeader = document.getElementById('member-count-header');
+        const videoGrid = document.getElementById('video-grid');
+
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const emojiPicker = document.getElementById('emoji-picker');
+        const globalReactionPicker = document.getElementById('global-reaction-picker');
+        const replyBar = document.getElementById('reply-bar');
+        const replyTargetText = document.getElementById('reply-target-text');
+        const logEl = document.getElementById('log');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        const micBtn = document.getElementById('mic-btn');
+        const micIconOn = document.getElementById('mic-icon-on');
+        const micIconOff = document.getElementById('mic-icon-off');
+        const deafenBtn = document.getElementById('deafen-btn');
+        const deafenIconOn = document.getElementById('deafen-icon-on');
+        const deafenIconOff = document.getElementById('deafen-icon-off');
+        const webcamBtn = document.getElementById('webcam-btn');
+        const screenBtn = document.getElementById('screen-btn');
+        const noiseBtn = document.getElementById('noise-btn');
+
+        const popover = document.getElementById('user-control-popover');
+        const cardUsernameEl = document.getElementById('card-username-el');
+        const cardProfileSubtitle = document.getElementById('card-profile-subtitle');
+        const cardAvatarEl = document.getElementById('card-avatar-el');
+        const cardEditOverlay = document.getElementById('card-edit-overlay');
+        const userMuteCheckbox = document.getElementById('user-mute-checkbox');
+        const userVolumeSlider = document.getElementById('user-volume-slider');
+        const volPercentage = document.getElementById('vol-percentage');
+        const muteWidgetRow = document.getElementById('mute-widget-row');
+        const volWidgetRow = document.getElementById('vol-widget-row');
+        const kickUserBtn = document.getElementById('kick-user-btn');
+
+        const cropModal = document.getElementById('crop-modal');
+        const cropCanvas = document.getElementById('crop-canvas');
+        const cropCtx = cropCanvas.getContext('2d');
+        const cropZoomSlider = document.getElementById('crop-zoom-slider');
+        const lightboxModal = document.getElementById('lightbox-modal');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const noticeModal = document.getElementById('notice-modal');
+        const noticeTitle = document.getElementById('notice-title');
+        const noticeMessage = document.getElementById('notice-message');
+        const noticeConfirmBtn = document.getElementById('notice-confirm-btn');
+
+        /* State Variables */
+        let peer = null;
+        let isHost = false;
+        let hostPeerId = '';
+        let currentRoomName = '';
+        let currentRoomPass = '';
         
-        const mediaGrid = document.getElementById('media-grid');
-        const membersList = document.getElementById('members-list');
-        const memberCount = document.getElementById('member-count');
-        const roomTitleDisplay = document.getElementById('room-title-display');
-        const exitRoomBtn = document.getElementById('exit-room-btn');
-        const shareInviteBtn = document.getElementById('share-invite-btn');
+        let connections = {};
+        let activePeerMetadata = {}; 
+        let localAudioStream = null;
+        let localAudioTrack = null;
+        let localVideoTrack = null;
+        let activeVideoStreamType = null;
+        let isMuted = true;
+        let isDeafened = true;
+        let isNoiseSuppressionActive = true; // Noise suppression on by default
+        let typingTimeout = null;
+        let audioContext = null;
+        let analyserNode = null;
+        let micSourceNode = null;
+        let audioStreamPromise = null;
 
-        const toggleMicBtn = document.getElementById('toggle-mic');
-        const toggleCamBtn = document.getElementById('toggle-cam');
-        const toggleScreenBtn = document.getElementById('toggle-screen');
+        let activeTargetPeerForControl = null;
+        let currentCardAvatarUrl = '';
+        let userAudioSettings = {};
+        let peerAudioNodes = {};
+        let peerSpeakingState = {};
+        let fullscreenControlsTimer = null;
+        let cropImageObj = null;
+        let cropDrag = false;
+        let cropX = 0, cropY = 0, cropScale = 1;
 
-        const chatMessages = document.getElementById('chat-messages');
-        const chatForm = document.getElementById('chat-form');
-        const chatInput = document.getElementById('chat-input');
-        const replyPreviewContainer = document.getElementById('reply-preview-container');
-        const replyPreviewText = document.getElementById('reply-preview-text');
-        const cancelReplyBtn = document.getElementById('cancel-reply-btn');
+        let myMessages = [];
+        let messageStore = {};
+        let messageReactions = {};
+        let editingMessageId = null;
+        let replyingToMsgId = null;
+        let activeReactionMsgId = null;
 
-        const profileModal = document.getElementById('profile-modal');
-        const modalProfileAvatar = document.getElementById('modal-profile-avatar');
-        const modalProfileName = document.getElementById('modal-profile-name');
-        const modalProfileBadges = document.getElementById('modal-profile-badges');
-        const modalProfileDesc = document.getElementById('modal-profile-desc');
-        const closeProfileModal = document.getElementById('close-profile-modal');
+        let username = localStorage.getItem('p2p_username') || `User ${Math.floor(Math.random() * 1000)}`;
+        let avatarBase64 = localStorage.getItem('p2p_avatar') || '';
+        lobbyUsernameInput.value = username;
 
-        const passwordModal = document.getElementById('password-modal');
-        const modalPasswordInput = document.getElementById('modal-password-input');
-        const cancelPasswordBtn = document.getElementById('cancel-password-btn');
-        const submitPasswordBtn = document.getElementById('submit-password-btn');
+        // Parse Hash for auto-join (#base64encodedString)
+        const hashVal = window.location.hash.substring(1);
+        if (hashVal) {
+            try {
+                const decodedJson = atob(hashVal);
+                const roomInfo = JSON.parse(decodedJson);
+                if (roomInfo.h) {
+                    joinCodeInput.value = hashVal;
+                }
+            } catch(e) {}
+        }
 
-        const inviteModal = document.getElementById('invite-modal');
-        const inviteQrCode = document.getElementById('invite-qr-code');
-        const inviteUrlInput = document.getElementById('invite-url-input');
-        const copyInviteBtn = document.getElementById('copy-invite-btn');
-        const closeInviteModal = document.getElementById('close-invite-modal');
+        updateAvatarUI();
+        noiseBtn.title = isNoiseSuppressionActive ? 'Noise Suppression: On' : 'Noise Suppression: Off';
 
-        // Init Profile
-        usernameInput.value = myUsername;
-        usernameInput.addEventListener('input', (e) => { 
-            myUsername = e.target.value.trim() || "Anonymous"; 
-            renderAvatarInput();
-        });
-
-        avatarFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if(file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    myAvatar = event.target.result; // Data URL for custom image
-                    renderAvatarInput();
-                };
-                reader.readAsDataURL(file);
+        document.addEventListener('click', (e) => {
+            if (!emojiPicker.contains(e.target) && !document.getElementById('emoji-btn')?.contains(e.target)) {
+                emojiPicker.classList.remove('active');
+            }
+            if (!globalReactionPicker.contains(e.target) && !e.target.closest('[title="Add Reaction"]')) {
+                globalReactionPicker.classList.remove('active');
+                activeReactionMsgId = null;
+            }
+            if (!popover.contains(e.target)) {
+                popover.style.display = 'none';
             }
         });
 
-        function renderAvatarInput() {
-            if(myAvatar && myAvatar.startsWith('data:')) {
-                avatarDisplay.innerHTML = `<img src="${myAvatar}" class="w-full h-full object-cover rounded-full">`;
-            } else {
-                const firstLetter = (myUsername || "U").charAt(0).toUpperCase();
-                avatarDisplay.innerHTML = `<span class="text-white text-xl font-bold">${firstLetter}</span>`;
-            }
-        }
-        renderAvatarInput();
+        let noticeOnClose = null;
 
-        function renderAvatarHTML(avatarStr, username, sizeClass = "w-7 h-7 text-xs") {
-            if(avatarStr && avatarStr.startsWith('data:')) {
-                return `<div class="${sizeClass} rounded-full overflow-hidden flex-shrink-0 bg-discord-accent"><img src="${avatarStr}" class="w-full h-full object-cover"></div>`;
-            } else {
-                const letter = (username || "U").charAt(0).toUpperCase();
-                return `<div class="${sizeClass} rounded-full flex items-center justify-center font-bold text-white bg-discord-accent flex-shrink-0">${letter}</div>`;
-            }
+        function showNotice(title, message, onClose = null) {
+            noticeTitle.textContent = title;
+            noticeMessage.textContent = message;
+            noticeOnClose = onClose;
+            noticeModal.style.display = 'flex';
+            noticeConfirmBtn.focus();
         }
 
-        // Load History
-        function getHistory() {
-            try { return JSON.parse(localStorage.getItem('p2p_lobby_history') || '[]'); } catch(e) { return []; }
+        function closeNotice() {
+            noticeModal.style.display = 'none';
+            const callback = noticeOnClose;
+            noticeOnClose = null;
+            if (callback) callback();
         }
-        function saveHistory(lobby) {
-            let hist = getHistory().filter(l => l.id !== lobby.id);
-            hist.unshift(lobby);
-            if(hist.length > 10) hist.pop();
-            localStorage.setItem('p2p_lobby_history', JSON.stringify(hist));
-            renderHistory();
+
+        function saveProfileFromLobby() {
+            const val = lobbyUsernameInput.value.trim();
+            if (val) {
+                username = val;
+                localStorage.setItem('p2p_username', username);
+            }
+            updateAvatarUI();
         }
-        function renderHistory() {
-            const hist = getHistory();
-            if(hist.length === 0) {
-                historySection.classList.add('hidden');
+
+        function submitCreateLobby() {
+            saveProfileFromLobby();
+            currentRoomName = createNameInput.value.trim() || `${username}'s Lobby`;
+            currentRoomPass = createPassInput.value.trim();
+            isHost = true;
+            startPeerNetwork(true);
+        }
+
+        function submitJoinLobby() {
+            let inputCode = joinCodeInput.value.trim();
+            if (!inputCode) {
+                showNotice('Invite code required', 'Enter a valid invite code or invite link to join a room.');
                 return;
             }
-            historySection.classList.remove('hidden');
-            historyList.innerHTML = '';
-            hist.forEach(l => {
-                const div = document.createElement('div');
-                div.className = "flex items-center justify-between bg-discord-darker p-2 rounded-lg text-sm";
-                div.innerHTML = `
-                    <span class="truncate cursor-pointer flex-1 text-gray-300 hover:text-white" title="${l.name}">${l.name}</span>
-                    <div class="flex items-center gap-2">
-                        <button class="join-hist bg-discord-accent px-2 py-1 rounded text-xs text-white" data-id="${l.id}">Join</button>
-                        <button class="del-hist text-gray-500 hover:text-discord-red px-1" data-id="${l.id}"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                `;
-                div.querySelector('.join-hist').addEventListener('click', () => { joinLobby(l.id); });
-                div.querySelector('.del-hist').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    let updated = getHistory().filter(item => item.id !== l.id);
-                    localStorage.setItem('p2p_lobby_history', JSON.stringify(updated));
-                    renderHistory();
-                });
-                historyList.appendChild(div);
-            });
-        }
-        renderHistory();
 
-        // Check invite query param on load
-        window.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const inviteCode = urlParams.get('invite');
-            if(inviteCode) {
-                joinCodeInput.value = inviteCode;
-                setTimeout(() => {
-                    if(confirm("You have an invite link to join a lobby. Join now?")) {
-                        joinLobby(inviteCode);
-                    }
-                }, 500);
+            try {
+                // If it's a full invite URL or encoded hash
+                if (inputCode.includes('#')) inputCode = inputCode.split('#')[1];
+                const decoded = JSON.parse(atob(inputCode));
+                hostPeerId = decoded.h;
+                currentRoomName = decoded.n || 'Lobby';
+            } catch(e) {
+                // Fallback direct peer ID
+                hostPeerId = inputCode;
             }
-        });
 
-        // Create Lobby
-        createLobbyBtn.addEventListener('click', () => {
-            const name = createLobbyNameInput.value.trim() || "Unnamed Lobby";
-            const pass = createLobbyPassInput.value;
-            const randomLobbyId = 'lobby_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
-            isHost = true;
-            startLobby(randomLobbyId, name, pass, true);
-        });
-
-        // Join Lobby
-        joinCodeBtn.addEventListener('click', () => {
-            const code = joinCodeInput.value.trim();
-            if(!code) return alert("Please enter a valid invite code or lobby ID.");
+            saveProfileFromLobby();
             isHost = false;
-            joinLobby(code);
-        });
+            startPeerNetwork(false);
+        }
 
-        function startLobby(lobbyId, name, password, hosting) {
-            currentLobbyId = lobbyId;
-            currentLobbyName = name;
-            lobbyPassword = password || "";
-            isHost = hosting;
+        function exitLobby() {
+            playSound('disconnect');
+            if (peer) peer.destroy();
+            window.location.hash = '';
+            window.location.href = window.location.pathname;
+        }
 
-            peer = new Peer(null, { debug: 1 });
+        function updateUrlHash() {
+            if (!hostPeerId) return;
+            const payload = { h: hostPeerId, n: currentRoomName };
+            const encodedHash = btoa(JSON.stringify(payload));
+            window.location.hash = encodedHash;
+        }
+
+        function renderRoomTitle(name) {
+            displayRoomName.textContent = `# ${name || 'Lobby'}`;
+        }
+
+        function startPeerNetwork(asHost) {
+            peer = new Peer(); // Random PeerJS ID for privacy & preventing name collisions
 
             peer.on('open', (id) => {
-                myPeerId = id;
-                if(isHost) {
-                    setupPeerServer(true);
-                    enterRoomUI();
+                if (asHost) {
+                    isHost = true;
+                    hostPeerId = id;
+                    renderRoomTitle(currentRoomName);
+                    hostSettingsBtn.style.display = 'flex';
+                    updateUrlHash();
+                    enterAppScreen();
+                    appendSystemLog(`Hosted room successfully.`);
                 } else {
-                    connectToLobby(lobbyId);
+                    connectToHost();
                 }
+
+                setupPeerListeners();
             });
 
             peer.on('error', (err) => {
-                console.error(err);
-                alert("Peer connection error: " + err.type);
-            });
-        }
-
-        function joinLobby(lobbyId) {
-            pendingJoinLobbyId = lobbyId;
-            const tempPeer = new Peer();
-            tempPeer.on('open', (id) => {
-                const conn = tempPeer.connect(lobbyId, { metadata: { type: 'AUTH_REQUEST', username: myUsername } });
-                
-                let responded = false;
-                conn.on('data', (data) => {
-                    responded = true;
-                    tempPeer.destroy();
-                    if(data.status === 'PASSWORD_REQUIRED') {
-                        passwordModal.classList.remove('hidden');
-                    } else if(data.status === 'OK') {
-                        startLobby(lobbyId, data.lobbyName || "Lobby", data.password || "", false);
-                    } else if(data.status === 'DENIED') {
-                        alert("Incorrect password or access denied.");
-                    }
-                });
-
-                setTimeout(() => {
-                    if(!responded) {
-                        tempPeer.destroy();
-                        startLobby(lobbyId, "Lobby", "", false);
-                    }
-                }, 3000);
-            });
-        }
-
-        submitPasswordBtn.addEventListener('click', () => {
-            const pass = modalPasswordInput.value;
-            passwordModal.classList.add('hidden');
-            startLobbyWithPassword(pendingJoinLobbyId, pass);
-        });
-
-        cancelPasswordBtn.addEventListener('click', () => { passwordModal.classList.add('hidden'); });
-
-        function startLobbyWithPassword(lobbyId, password) {
-            currentLobbyId = lobbyId;
-            lobbyPassword = password;
-            isHost = false;
-            peer = new Peer();
-            peer.on('open', (id) => {
-                myPeerId = id;
-                connectToLobby(lobbyId, password);
-            });
-        }
-
-        function connectToLobby(lobbyId, password = "") {
-            const conn = peer.connect(lobbyId, {
-                metadata: { type: 'JOIN', username: myUsername, avatar: myAvatar, password: password, isHost: false, micMuted: !micEnabled }
-            });
-
-            conn.on('open', () => {
-                setupConnectionEvents(conn);
-            });
-
-            conn.on('error', () => { alert("Failed to connect to lobby."); });
-            setupPeerServer(false);
-        }
-
-        function setupPeerServer(hosting) {
-            peer.on('connection', (conn) => {
-                conn.on('data', (data) => {
-                    if(data.type === 'AUTH_REQUEST') {
-                        if(lobbyPassword && data.password !== lobbyPassword) {
-                            conn.send({ status: 'DENIED' });
-                        } else {
-                            conn.send({ status: 'OK', lobbyName: currentLobbyName, password: lobbyPassword });
-                        }
-                    } else if(data.type === 'JOIN') {
-                        if(lobbyPassword && data.password !== lobbyPassword) {
-                            conn.send({ status: 'DENIED' });
-                            return;
-                        }
-                        activeConnections[conn.peer] = { conn, username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
-                        peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
-                        
-                        broadcastPeersList();
-                        updateMembersUI();
-                        rebuildMediaGrid();
-
-                        if(myStream) {
-                            const call = peer.call(conn.peer, myStream, { metadata: { type: 'cam', username: myUsername, avatar: myAvatar } });
-                            setupCallEvents(call, conn.peer);
-                        }
-                    } else if(data.type === 'PEERS_UPDATE') {
-                        data.peers.forEach(p => {
-                            if(p.id !== peer.id && !activeConnections[p.id]) {
-                                connectToPeer(p.id, p.username, p.avatar, p.isHost, p.micMuted);
-                            }
-                        });
-                    } else if(data.type === 'USER_INFO') {
-                        peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
-                        if(activeConnections[conn.peer]) {
-                            activeConnections[conn.peer].username = data.username;
-                            activeConnections[conn.peer].avatar = data.avatar;
-                            activeConnections[conn.peer] = Object.assign(activeConnections[conn.peer], data);
-                        }
-                        updateMembersUI();
-                        rebuildMediaGrid();
-                    } else if(data.type === 'CHAT_MESSAGE') {
-                        appendChatMessage(data.message);
-                        if(isHost) {
-                            Object.keys(activeConnections).forEach(pid => {
-                                if(pid !== conn.peer && activeConnections[pid].conn && activeConnections[pid].conn.open) {
-                                    activeConnections[pid].conn.send(data);
-                                }
-                            });
-                        }
-                    }
-                });
-            });
-
-            peer.on('call', (call) => {
-                navigator.mediaDevices?.getUserMedia({ video: true, audio: true }).then(stream => {
-                    myStream = stream;
-                    call.answer(myStream);
-                }).catch(() => { call.answer(); });
-
-                setupCallEvents(call, call.peer, call.metadata);
-            });
-
-            enterRoomUI();
-            saveHistory({ id: currentLobbyId, name: currentLobbyName });
-        }
-
-        function connectToPeer(peerId, username, avatar, hostStatus, mutedStatus) {
-            if(activeConnections[peerId]) return;
-            const conn = peer.connect(peerId, {
-                metadata: { type: 'JOIN', username: myUsername, avatar: myAvatar, password: lobbyPassword, isHost: isHost, micMuted: !micEnabled }
-            });
-
-            conn.on('open', () => {
-                activeConnections[peerId] = { conn, username, avatar, isHost: hostStatus, micMuted: mutedStatus };
-                peersInRoom[peerId] = { username, avatar, isHost: hostStatus, micMuted: mutedStatus };
-                updateMembersUI();
-                rebuildMediaGrid();
-
-                if(myStream) {
-                    const call = peer.call(peerId, myStream, { metadata: { type: 'cam', username: myUsername, avatar: myAvatar } });
-                    setupCallEvents(call, peerId);
-                }
-            });
-        }
-
-        function setupConnectionEvents(conn) {
-            activeConnections[conn.peer] = { conn, username: "Peer", avatar: "", isHost: false, micMuted: false };
-            conn.on('data', (data) => {
-                if(data.type === 'PEERS_UPDATE') {
-                    data.peers.forEach(p => {
-                        if(p.id !== peer.id && !activeConnections[p.id]) {
-                            connectToPeer(p.id, p.username, p.avatar, p.isHost, p.micMuted);
-                        }
-                    });
-                } else if(data.type === 'USER_INFO') {
-                    peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
-                    if(activeConnections[conn.peer]) {
-                        activeConnections[conn.peer].username = data.username;
-                        activeConnections[conn.peer].avatar = data.avatar;
-                        activeConnections[conn.peer].isHost = data.isHost;
-                        activeConnections[conn.peer].micMuted = data.micMuted;
-                    }
-                    updateMembersUI();
-                    rebuildMediaGrid();
-                } else if(data.type === 'CHAT_MESSAGE') {
-                    appendChatMessage(data.message);
-                }
-            });
-
-            conn.send({ type: 'USER_INFO', username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled });
-        }
-
-        function setupCallEvents(call, peerId, metadata) {
-            const username = metadata?.username || peersInRoom[peerId]?.username || "User";
-            const avatar = metadata?.avatar || peersInRoom[peerId]?.avatar || "";
-            const isScreen = metadata?.type === 'screen';
-
-            if(!peersInRoom[peerId]) peersInRoom[peerId] = { username, avatar, isHost: false, micMuted: false };
-
-            call.on('stream', (remoteStream) => {
-                activeConnections[peerId] = activeConnections[peerId] || {};
-                activeConnections[peerId].stream = remoteStream;
-                activeConnections[peerId].username = username;
-                activeConnections[peerId].avatar = avatar;
-                activeConnections[peerId].isScreen = isScreen;
-                rebuildMediaGrid();
-            });
-
-            call.on('close', () => {
-                if(activeConnections[peerId]) {
-                    delete activeConnections[peerId].stream;
-                }
-                rebuildMediaGrid();
-            });
-        }
-
-        function broadcastPeersList() {
-            const peerList = Object.keys(activeConnections).map(id => ({
-                id,
-                username: activeConnections[id].username,
-                avatar: activeConnections[id].avatar,
-                isHost: activeConnections[id].isHost,
-                micMuted: activeConnections[id].micMuted
-            }));
-            peerList.push({ id: peer.id, username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled });
-
-            Object.values(activeConnections).forEach(item => {
-                if(item.conn && item.conn.open) {
-                    item.conn.send({ type: 'PEERS_UPDATE', peers: peerList });
-                }
-            });
-        }
-
-        function broadcastUserInfo() {
-            const info = { type: 'USER_INFO', username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled };
-            Object.values(activeConnections).forEach(item => {
-                if(item.conn && item.conn.open) {
-                    item.conn.send(info);
-                }
-            });
-        }
-
-        function enterRoomUI() {
-            landingView.classList.add('hidden');
-            roomView.classList.remove('hidden');
-            roomTitleDisplay.textContent = currentLobbyName;
-            rebuildMediaGrid();
-            updateMembersUI();
-        }
-
-        // Chat functionality & replies
-        chatForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const text = chatInput.value.trim();
-            if(!text) return;
-
-            const msg = {
-                id: 'msg_' + Math.random().toString(36).substring(2, 9),
-                senderId: myPeerId || 'self',
-                senderName: myUsername,
-                avatar: myAvatar,
-                text: text,
-                replyTo: replyingTo ? { id: replyingTo.id, name: replyingTo.name, text: replyingTo.text } : null,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
-
-            appendChatMessage(msg);
-            
-            Object.values(activeConnections).forEach(item => {
-                if(item.conn && item.conn.open) {
-                    item.conn.send({ type: 'CHAT_MESSAGE', message: msg });
-                }
-            });
-
-            chatInput.value = '';
-            clearReply();
-        });
-
-        function appendChatMessage(msg) {
-            const div = document.createElement('div');
-            div.className = "flex flex-col gap-1 group";
-            
-            let replyHtml = '';
-            if(msg.replyTo) {
-                replyHtml = `<div class="text-xs text-gray-500 border-l-2 border-discord-accent pl-2 italic">Replying to ${msg.replyTo.name}: "${msg.replyTo.text}"</div>`;
-            }
-
-            const avatarElHtml = renderAvatarHTML(msg.avatar, msg.senderName, "w-7 h-7 text-xs");
-
-            div.innerHTML = `
-                ${replyHtml}
-                <div class="flex items-start gap-2.5">
-                    ${avatarElHtml}
-                    <div class="flex-1 flex flex-col">
-                        <div class="flex items-center gap-2">
-                            <span class="font-semibold text-xs text-white">${msg.senderName}</span>
-                            <span class="text-[10px] text-gray-500">${msg.timestamp}</span>
-                        </div>
-                        <p class="text-sm text-gray-300 break-words">${escapeHtml(msg.text)}</p>
-                    </div>
-                    <button class="reply-btn opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white text-xs px-1" title="Reply"><i class="fa-solid fa-reply"></i></button>
-                </div>
-            `;
-
-            div.querySelector('.reply-btn').addEventListener('click', () => {
-                setReply({ id: msg.id, name: msg.senderName, text: msg.text });
-            });
-
-            chatMessages.appendChild(div);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function setReply(msg) {
-            replyingTo = msg;
-            replyPreviewText.textContent = `Replying to ${msg.name}: "${msg.text}"`;
-            replyPreviewContainer.classList.remove('hidden');
-            chatInput.focus();
-        }
-
-        function clearReply() {
-            replyingTo = null;
-            replyPreviewContainer.classList.add('hidden');
-        }
-
-        cancelReplyBtn.addEventListener('click', clearReply);
-
-        function escapeHtml(text) {
-            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-        }
-
-        // Profile Modal Inspection
-        function openProfileModal(user) {
-            modalProfileName.textContent = user.username;
-            
-            if(user.avatar && user.avatar.startsWith('data:')) {
-                modalProfileAvatar.innerHTML = `<img src="${user.avatar}" class="w-full h-full object-cover">`;
-            } else {
-                const firstLetter = (user.username || "U").charAt(0).toUpperCase();
-                modalProfileAvatar.innerHTML = `<span class="text-white text-3xl font-bold">${firstLetter}</span>`;
-            }
-
-            modalProfileBadges.innerHTML = '';
-            if(user.isHost) {
-                modalProfileBadges.innerHTML += `<span class="bg-yellow-500/20 text-yellow-400 text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"><i class="fa-solid fa-crown"></i> Host</span>`;
-            } else {
-                modalProfileBadges.innerHTML += `<span class="bg-blue-500/20 text-blue-400 text-xs px-2.5 py-1 rounded-full font-medium">Participant</span>`;
-            }
-
-            if(user.micMuted) {
-                modalProfileBadges.innerHTML += `<span class="bg-red-500/20 text-red-400 text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"><i class="fa-solid fa-microphone-slash"></i> Muted</span>`;
-            } else {
-                modalProfileBadges.innerHTML += `<span class="bg-green-500/20 text-green-400 text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"><i class="fa-solid fa-microphone"></i> Unmuted</span>`;
-            }
-
-            profileModal.classList.remove('hidden');
-        }
-
-        closeProfileModal.addEventListener('click', () => { profileModal.classList.add('hidden'); });
-
-        // UI Updates & Grid Management (Discord Style Tiles)
-        function rebuildMediaGrid() {
-            mediaGrid.innerHTML = '';
-
-            const participants = [];
-            participants.push({
-                id: myPeerId || 'self',
-                username: myUsername + " (You)",
-                avatar: myAvatar,
-                stream: screenStream || myStream,
-                isScreen: !!screenStream,
-                isSelf: true,
-                isHost: isHost,
-                micMuted: !micEnabled
-            });
-
-            Object.keys(activeConnections).forEach(id => {
-                const conn = activeConnections[id];
-                participants.push({
-                    id: id,
-                    username: conn.username || "User",
-                    avatar: conn.avatar || "",
-                    stream: conn.stream,
-                    isScreen: conn.isScreen,
-                    isSelf: false,
-                    isHost: conn.isHost,
-                    micMuted: conn.micMuted
-                });
-            });
-
-            participants.forEach(p => {
-                const tile = document.createElement('div');
-                tile.className = "bg-discord-darker rounded-xl overflow-hidden relative flex flex-col items-center justify-center border border-gray-700/50 aspect-video shadow-lg cursor-pointer group";
-                tile.addEventListener('click', () => {
-                    openProfileModal({ username: p.username.replace(" (You)", ""), avatar: p.avatar, isHost: p.isHost, micMuted: p.micMuted });
-                });
-
-                if (p.stream && p.stream.getVideoTracks().length > 0) {
-                    const video = document.createElement('video');
-                    video.srcObject = p.stream;
-                    video.autoplay = true;
-                    video.playsInline = true;
-                    if (p.isSelf || p.isScreen) video.muted = true; // Feedback loop preventer
-                    video.className = "w-full h-full object-cover";
-                    tile.appendChild(video);
-
-                    const badge = document.createElement('div');
-                    badge.className = "absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-lg text-xs font-medium text-white flex items-center gap-2";
-                    const avatarHtmlMini = renderAvatarHTML(p.avatar, p.username, "w-4 h-4 text-[10px]");
-                    const hostIcon = p.isHost ? `<i class="fa-solid fa-crown text-yellow-400 ml-1" title="Host"></i>` : '';
-                    const mutedIcon = p.micMuted ? `<i class="fa-solid fa-microphone-slash text-red-400 ml-1" title="Muted"></i>` : '';
-                    badge.innerHTML = `${avatarHtmlMini}<span>${p.username}</span>${hostIcon}${mutedIcon}`;
-                    tile.appendChild(badge);
+                if (!appScreen.style.display || appScreen.style.display === 'none') {
+                    showNotice('Unable to connect', `The room connection failed (${err.type}). Check the invite code and try again.`);
+                    if (peer && !peer.destroyed) peer.destroy();
+                    peer = null;
                 } else {
-                    const hostBadge = p.isHost ? `<span class="absolute top-3 right-3 bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Host</span>` : '';
-                    const mutedBadge = p.micMuted ? `<span class="absolute top-3 left-3 bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1"><i class="fa-solid fa-microphone-slash"></i></span>` : '';
+                    appendSystemLog(`Network Error: ${err.type}`);
+                }
+            });
+        }
 
-                    const letterOrAvatar = (p.avatar && p.avatar.startsWith('data:')) 
-                        ? `<div class="w-20 h-20 rounded-full overflow-hidden shadow-inner border border-discord-accent/40 bg-discord-accent"><img src="${p.avatar}" class="w-full h-full object-cover"></div>`
-                        : `<div class="w-20 h-20 rounded-full bg-discord-accent flex items-center justify-center text-3xl font-bold text-white shadow-inner border border-discord-accent/40">${(p.username || "U").charAt(0).toUpperCase()}</div>`;
+        function enterAppScreen() {
+            lobbyScreen.style.display = 'none';
+            appScreen.style.display = 'flex';
+            renderRoomTitle(currentRoomName);
+            hostSettingsBtn.style.display = isHost ? 'flex' : 'none';
+            appendSystemLog('Connected to mesh network.');
+            renderSelfStageCard();
+            updatePeerListUI();
+            initAudioAnalyser();
+        }
 
-                    tile.innerHTML = `
-                        ${hostBadge}
-                        ${mutedBadge}
-                        <div class="flex flex-col items-center justify-center gap-3">
-                            ${letterOrAvatar}
-                            <span class="font-semibold text-sm text-gray-200">${p.username}</span>
+        function connectToHost() {
+            if (!hostPeerId || hostPeerId === peer.id) return;
+            const conn = peer.connect(hostPeerId);
+            setupConnection(conn);
+        }
+
+        function setupPeerListeners() {
+            peer.on('connection', (conn) => setupConnection(conn, false));
+            peer.on('call', (incomingCall) => {
+                ensureAudioStream().then(() => {
+                    incomingCall.answer(getLocalCombinedStream());
+                    incomingCall.on('stream', (remoteStream) => handleRemoteStream(incomingCall.peer, remoteStream));
+                }).catch(error => appendSystemLog(`Microphone Error: ${error.message}`));
+            });
+        }
+
+        function setupConnection(conn, isInitiator = true) {
+            conn.on('open', () => {
+                connections[conn.peer] = conn;
+                conn.isInitiator = isInitiator;
+                if (isInitiator) {
+                    conn.send({
+                        type: 'handshake',
+                        user: username,
+                        avatar: avatarBase64,
+                        pass: joinPassInput.value.trim(),
+                        muted: isMuted,
+                        deafened: isDeafened
+                    });
+                }
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'handshake') {
+                    if (isHost && currentRoomPass && data.pass !== currentRoomPass) {
+                        conn.send({ type: 'auth-failed', reason: 'Incorrect Room Password' });
+                        setTimeout(() => conn.close(), 500);
+                        return;
+                    }
+                    conn.authenticated = true;
+                    conn.send({ type: 'auth-success', user: username, avatar: avatarBase64, muted: isMuted, deafened: isDeafened });
+                    playSound('join');
+                    if (isHost) {
+                        conn.send({
+                            type: 'room-sync',
+                            name: currentRoomName,
+                            peers: Object.keys(connections).filter(id => id !== conn.peer),
+                            hostId: peer.id
+                        });
+                    }
+                    activePeerMetadata[conn.peer] = { user: data.user, avatar: data.avatar, videoType: null, muted: !!data.muted, deafened: !!data.deafened };
+                    conn.peerUsername = data.user;
+                    conn.peerAvatar = data.avatar;
+                    renderRemoteStageCard(conn.peer);
+                    updatePeerListUI();
+                    appendSystemLog(`${data.user || 'A user'} joined the lobby.`);
+                } else if (data.type === 'auth-success') {
+                    conn.authenticated = true;
+                    activePeerMetadata[conn.peer] = { user: data.user, avatar: data.avatar, videoType: null, muted: !!data.muted, deafened: !!data.deafened };
+                    conn.peerUsername = data.user;
+                    conn.peerAvatar = data.avatar;
+                    if (!appScreen.style.display || appScreen.style.display === 'none') {
+                        if (conn.peer !== hostPeerId) return;
+                        enterAppScreen();
+                    }
+                    playSound('join');
+                    renderRemoteStageCard(conn.peer);
+                    updatePeerListUI();
+                    if (conn.isInitiator) startMediaCall(conn.peer);
+                } else if (data.type === 'audio-status') {
+                    if (!activePeerMetadata[conn.peer]) activePeerMetadata[conn.peer] = {};
+                    activePeerMetadata[conn.peer].muted = !!data.muted;
+                    activePeerMetadata[conn.peer].deafened = !!data.deafened;
+                    updatePeerListUI();
+                } else if (data.type === 'auth-failed') {
+                    if (peer && !peer.destroyed) peer.destroy();
+                    peer = null;
+                    connections = {};
+                    activePeerMetadata = {};
+                    showNotice('Could not join lobby', data.reason || 'The room password was incorrect.');
+                } else if (data.type === 'room-sync') {
+                    currentRoomName = data.name;
+                    hostPeerId = data.hostId;
+                    renderRoomTitle(currentRoomName);
+                    updateUrlHash();
+                    data.peers.forEach(pId => {
+                        if (pId !== peer.id && !connections[pId]) connectToPeer(pId);
+                    });
+                } else if (data.type === 'profile-update') {
+                    if (!activePeerMetadata[conn.peer]) activePeerMetadata[conn.peer] = {};
+                    activePeerMetadata[conn.peer].user = data.user;
+                    activePeerMetadata[conn.peer].avatar = data.avatar;
+                    conn.peerUsername = data.user;
+                    conn.peerAvatar = data.avatar;
+                    updateStageCardUI(conn.peer);
+                    updatePeerListUI();
+                } else if (data.type === 'stream-status') {
+                    if (!activePeerMetadata[conn.peer]) activePeerMetadata[conn.peer] = {};
+                    activePeerMetadata[conn.peer].videoType = data.videoType;
+                    updateStageCardUI(conn.peer);
+                    updatePeerListUI();
+                } else if (data.type === 'kick') {
+                    sessionStorage.setItem('p2p_kicked_banned', 'true');
+                    showNotice('Removed from lobby', 'The host removed you from this room.', () => window.location.reload());
+                } else if (data.type === 'chat') {
+                    playSound('message');
+                    appendChatMessage(conn.peerUsername, conn.peerAvatar, marked.parse(data.message.trim()), data.message.trim(), data.msgId, false, data.replyRef);
+                } else if (data.type === 'edit-chat') {
+                    const tEl = document.getElementById(`text-${data.msgId}`);
+                    if (tEl) tEl.innerHTML = marked.parse(data.message.trim());
+                    if (messageStore[data.msgId]) messageStore[data.msgId].rawText = data.message.trim();
+                } else if (data.type === 'delete-msg') {
+                    const el = document.getElementById(data.msgId);
+                    if (el) el.remove();
+                } else if (data.type === 'reaction') {
+                    toggleReactionOnMsg(data.msgId, data.emoji, data.user);
+                } else if (data.type === 'typing') {
+                    showTypingIndicator(conn.peerUsername);
+                } else if (data.type === 'file') {
+                    playSound('message');
+                    const fileCardHtml = `
+                        <div class="file-card">
+                            <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
+                            <div class="file-info">
+                                <div class="file-name">${data.fileName}</div>
+                                <div class="file-size">${data.fileSizeStr || ''}</div>
+                                <a class="file-download-btn" href="${data.fileData}" download="${data.fileName}">Download</a>
+                            </div>
                         </div>
                     `;
+                    if (data.fileType.startsWith('image/')) {
+                        appendChatMessage(conn.peerUsername, conn.peerAvatar, `<br><img class="media-preview" src="${data.fileData}" alt="${data.fileName}" onclick="openLightbox('${data.fileData}')">`, `Shared file: ${data.fileName}`, data.msgId, false, data.replyRef);
+                    } else {
+                        appendChatMessage(conn.peerUsername, conn.peerAvatar, fileCardHtml, `Shared file: ${data.fileName}`, data.msgId, false, data.replyRef);
+                    }
                 }
+            });
 
-                mediaGrid.appendChild(tile);
+            conn.on('close', () => {
+                if (conn.authenticated) {
+                    playSound('leave');
+                    if (appScreen.style.display !== 'none') appendSystemLog(`${conn.peerUsername || 'A user'} left the lobby.`);
+                }
+                removeStageCard(conn.peer);
+                const audioNode = peerAudioNodes[conn.peer];
+                if (audioNode) {
+                    audioNode.source.disconnect();
+                    audioNode.analyser.disconnect();
+                    audioNode.gain.disconnect();
+                    delete peerAudioNodes[conn.peer];
+                }
+                delete peerSpeakingState[conn.peer];
+                delete connections[conn.peer];
+                delete activePeerMetadata[conn.peer];
+                updatePeerListUI();
             });
         }
 
-        function updateMembersUI() {
-            membersList.innerHTML = '';
+        function connectToPeer(targetId) {
+            if (connections[targetId] || targetId === peer.id) return;
+            const conn = peer.connect(targetId);
+            setupConnection(conn);
+        }
+
+        function startMediaCall(targetId) {
+            ensureAudioStream().then(() => {
+                if (!peer || peer.destroyed || !connections[targetId]?.authenticated) return;
+                const call = peer.call(targetId, getLocalCombinedStream());
+                call.on('stream', (remoteStream) => handleRemoteStream(targetId, remoteStream));
+            }).catch(error => appendSystemLog(`Microphone Error: ${error.message}`));
+        }
+
+        function broadcast(payload) {
+            Object.values(connections).forEach(conn => {
+                if (conn.open) conn.send(payload);
+            });
+        }
+
+        function broadcastLocalAudioStatus() {
+            Object.values(connections).forEach(conn => {
+                if (conn.open && conn.authenticated) {
+                    conn.send({ type: 'audio-status', muted: isMuted, deafened: isDeafened });
+                }
+            });
+        }
+
+        /* --- AUDIO & SOUND EFFECTS --- */
+        async function ensureAudioStream() {
+            if (!localAudioStream) {
+                if (!audioStreamPromise) {
+                    audioStreamPromise = navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: isNoiseSuppressionActive,
+                            autoGainControl: true
+                        }
+                    }).then(stream => {
+                        localAudioStream = stream;
+                        localAudioTrack = stream.getAudioTracks()[0];
+                        localAudioTrack.enabled = !isMuted;
+                        return stream;
+                    }).finally(() => { audioStreamPromise = null; });
+                }
+                return audioStreamPromise;
+            }
+            return localAudioStream;
+        }
+
+        function getLocalCombinedStream() {
+            const tracks = [];
+            if (localAudioTrack) tracks.push(localAudioTrack);
+            if (localVideoTrack) tracks.push(localVideoTrack);
+            return new MediaStream(tracks);
+        }
+
+        function renegotiateMediaTracks() {
+            const combined = getLocalCombinedStream();
+            Object.keys(connections).forEach(targetId => {
+                const call = peer.call(targetId, combined);
+                call.on('stream', (remoteStream) => handleRemoteStream(targetId, remoteStream));
+            });
+        }
+
+        const audioCtxSound = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (isDeafened && type !== 'join' && type !== 'leave') return;
+            if (audioCtxSound.state === 'suspended') audioCtxSound.resume();
+            const now = audioCtxSound.currentTime;
+            const osc = audioCtxSound.createOscillator();
+            const gain = audioCtxSound.createGain();
             
-            // Add self
-            const selfDiv = document.createElement('div');
-            selfDiv.className = "flex items-center gap-3 p-2 rounded-lg bg-discord-dark/40 cursor-pointer hover:bg-discord-dark transition";
-            const selfAvatarEl = renderAvatarHTML(myAvatar, myUsername, "w-6 h-6 text-xs");
-            selfDiv.innerHTML = `
-                ${selfAvatarEl}
-                <span class="text-xs font-medium text-white truncate flex-1">${myUsername} (You)</span>
-                ${isHost ? '<i class="fa-solid fa-crown text-yellow-400 text-xs" title="Host"></i>' : ''}
-                ${!micEnabled ? '<i class="fa-solid fa-microphone-slash text-red-400 text-xs" title="Muted"></i>' : ''}
-            `;
-            selfDiv.addEventListener('click', () => {
-                openProfileModal({ username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled });
-            });
-            membersList.appendChild(selfDiv);
+            if (type === 'mute') {
+                osc.frequency.setValueAtTime(329.63, now);
+            } else if (type === 'unmute' || type === 'connect') {
+                osc.frequency.setValueAtTime(523.25, now);
+            } else if (type === 'stream') {
+                osc.frequency.setValueAtTime(659.25, now);
+            } else if (type === 'message') {
+                osc.frequency.setValueAtTime(440, now);
+            } else if (type === 'disconnect') {
+                osc.frequency.setValueAtTime(220, now);
+            } else if (type === 'join') {
+                osc.frequency.setValueAtTime(659.25, now);
+            } else if (type === 'leave') {
+                osc.frequency.setValueAtTime(293.66, now);
+            }
 
-            // Add peers
-            Object.keys(activeConnections).forEach(id => {
-                const conn = activeConnections[id];
-                const div = document.createElement('div');
-                div.className = "flex items-center gap-3 p-2 rounded-lg hover:bg-discord-dark/20 transition cursor-pointer";
-                const peerAvatar = conn.avatar || '';
-                const peerAvatarEl = renderAvatarHTML(peerAvatar, conn.username || 'User', "w-6 h-6 text-xs");
-                div.innerHTML = `
-                    ${peerAvatarEl}
-                    <span class="text-xs font-medium text-gray-300 truncate flex-1">${conn.username || 'User'}</span>
-                    ${conn.isHost ? '<i class="fa-solid fa-crown text-yellow-400 text-xs" title="Host"></i>' : ''}
-                    ${conn.micMuted ? '<i class="fa-solid fa-microphone-slash text-red-400 text-xs" title="Muted"></i>' : ''}
-                `;
-                div.addEventListener('click', () => {
-                    openProfileModal({ username: conn.username, avatar: peerAvatar, isHost: conn.isHost, micMuted: conn.micMuted });
-                });
-                membersList.appendChild(div);
-            });
-
-            const totalMembers = Object.keys(activeConnections).length + 1;
-            memberCount.textContent = totalMembers;
+            gain.gain.setValueAtTime(0.01, now);
+            gain.gain.linearRampToValueAtTime(type === 'join' || type === 'leave' ? 0.07 : 0.1, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + (type === 'join' || type === 'leave' ? 0.2 : 0.12));
+            osc.connect(gain);
+            gain.connect(audioCtxSound.destination);
+            osc.start(now);
+            osc.stop(now + (type === 'join' || type === 'leave' ? 0.2 : 0.12));
         }
 
-        // Media Controls (Mic, Cam, Screen Share)
-        let micEnabled = true;
-        let camEnabled = false;
+        function initAudioAnalyser() {
+            try {
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 512;
+                ensureAudioStream().then(stream => {
+                    if (!audioContext || !stream.getAudioTracks().length) return;
+                    micSourceNode = audioContext.createMediaStreamSource(stream);
+                    micSourceNode.connect(analyserNode);
+                    audioContext.resume().catch(() => {});
+                    detectSpeech();
+                }).catch(() => {});
+            } catch(e) {}
+        }
 
-        toggleMicBtn.addEventListener('click', async () => {
-            if(!myStream) {
+        async function toggleNoiseSuppression() {
+            isNoiseSuppressionActive = !isNoiseSuppressionActive;
+            noiseBtn.classList.toggle('noise-active', isNoiseSuppressionActive);
+            noiseBtn.title = isNoiseSuppressionActive ? 'Noise Suppression: On' : 'Noise Suppression: Off';
+            if (localAudioTrack) {
                 try {
-                    myStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                } catch(e) {
-                    alert("Microphone permission denied.");
+                    await localAudioTrack.applyConstraints({ noiseSuppression: isNoiseSuppressionActive });
+                } catch (error) {
+                    isNoiseSuppressionActive = !isNoiseSuppressionActive;
+                    noiseBtn.classList.toggle('noise-active', isNoiseSuppressionActive);
+                    noiseBtn.title = isNoiseSuppressionActive ? 'Noise Suppression: On' : 'Noise Suppression: Off';
+                    showNotice('Noise suppression unavailable', 'This browser could not change microphone noise suppression settings.');
                     return;
                 }
             }
-            micEnabled = !micEnabled;
-            myStream.getAudioTracks().forEach(track => track.enabled = micEnabled);
-            toggleMicBtn.className = micEnabled 
-                ? "w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg"
-                : "w-12 h-12 rounded-full bg-discord-red hover:bg-red-600 flex items-center justify-center text-white transition text-lg";
-            toggleMicBtn.innerHTML = micEnabled ? '<i class="fa-solid fa-microphone"></i>' : '<i class="fa-solid fa-microphone-slash"></i>';
-            
-            broadcastUserInfo();
-            updateMembersUI();
-            rebuildMediaGrid();
-        });
-
-        toggleCamBtn.addEventListener('click', async () => {
-            try {
-                if(!camEnabled) {
-                    const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: micEnabled });
-                    myStream = camStream;
-                    camEnabled = true;
-                    toggleCamBtn.className = "w-12 h-12 rounded-full bg-discord-green hover:bg-green-600 flex items-center justify-center text-white transition text-lg";
-                } else {
-                    myStream.getVideoTracks().forEach(track => track.stop());
-                    camEnabled = false;
-                    toggleCamBtn.className = "w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg";
-                }
-                rebuildMediaGrid();
-                updatePeerCalls();
-            } catch(e) {
-                alert("Camera permission error or unavailable.");
-            }
-        });
-
-        toggleScreenBtn.addEventListener('click', async () => {
-            try {
-                if(!screenStream) {
-                    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                    
-                    screenStream.getVideoTracks()[0].onended = () => {
-                        stopScreenShare();
-                    };
-
-                    toggleScreenBtn.className = "w-12 h-12 rounded-full bg-discord-green hover:bg-green-600 flex items-center justify-center text-white transition text-lg";
-                    rebuildMediaGrid();
-                    updatePeerCalls('screen', screenStream);
-                } else {
-                    stopScreenShare();
-                }
-            } catch(e) {
-                console.log("Screen share cancelled or failed", e);
-            }
-        });
-
-        function stopScreenShare() {
-            if(screenStream) {
-                screenStream.getTracks().forEach(t => t.stop());
-                screenStream = null;
-            }
-            toggleScreenBtn.className = "w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg";
-            rebuildMediaGrid();
-            updatePeerCalls('cam', myStream);
+            appendSystemLog(isNoiseSuppressionActive ? "Noise suppression enabled." : "Noise suppression disabled.");
         }
 
-        function updatePeerCalls(type = 'cam', streamToShare = myStream) {
-            Object.keys(activeConnections).forEach(id => {
-                if(peer && streamToShare) {
-                    const call = peer.call(id, streamToShare, { metadata: { type: type, username: myUsername, avatar: myAvatar } });
-                    setupCallEvents(call, id);
+        function detectSpeech() {
+            if (!analyserNode) return;
+            const isSpeaking = !isMuted && getAudioLevel(analyserNode) > 0.035;
+            peerSpeakingState.self = isSpeaking;
+            document.getElementById('card-local')?.classList.toggle('speaking', isSpeaking);
+            peerListEl.querySelector('[data-peer-id="self"]')?.classList.toggle('speaking', isSpeaking);
+            requestAnimationFrame(detectSpeech);
+        }
+
+        function getAudioLevel(analyser) {
+            const samples = new Uint8Array(analyser.fftSize);
+            analyser.getByteTimeDomainData(samples);
+            let sumSquares = 0;
+            for (const sample of samples) {
+                const normalized = (sample - 128) / 128;
+                sumSquares += normalized * normalized;
+            }
+            return Math.sqrt(sumSquares / samples.length);
+        }
+
+        function handleRemoteStream(peerId, remoteStream) {
+            const videoEl = document.getElementById(`v-${peerId}`);
+            if (videoEl) {
+                videoEl.srcObject = remoteStream;
+                videoEl.muted = true;
+                videoEl.volume = 1;
+                videoEl.play().catch(() => {});
+
+                try {
+                    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    audioContext.resume().catch(() => {});
+                    const previousNode = peerAudioNodes[peerId];
+                    if (previousNode) {
+                        previousNode.source.disconnect();
+                        previousNode.analyser.disconnect();
+                        previousNode.gain.disconnect();
+                    }
+                    const source = audioContext.createMediaStreamSource(remoteStream);
+                    const analyser = audioContext.createAnalyser();
+                    const gain = audioContext.createGain();
+                    analyser.fftSize = 512;
+                    source.connect(analyser);
+                    analyser.connect(gain);
+                    gain.connect(audioContext.destination);
+                    const audioNode = { source, analyser, gain };
+                    peerAudioNodes[peerId] = audioNode;
+                    detectPeerSpeech(peerId, audioNode);
+                    applyPeerAudioSettings(peerId);
+                } catch (error) {
+                    videoEl.muted = userAudioSettings[peerId]?.muted || isDeafened;
+                    videoEl.volume = Math.min(1, userAudioSettings[peerId]?.volume ?? 1);
+                }
+            }
+        }
+
+        function detectPeerSpeech(peerId, audioNode) {
+            const checkLevel = () => {
+            if (peerAudioNodes[peerId] !== audioNode) return;
+            const isSpeaking = getAudioLevel(audioNode.analyser) > 0.035;
+                peerSpeakingState[peerId] = isSpeaking;
+                document.getElementById(`card-${peerId}`)?.classList.toggle('speaking', isSpeaking);
+                peerListEl.querySelector(`[data-peer-id="${peerId}"]`)?.classList.toggle('speaking', isSpeaking);
+                requestAnimationFrame(checkLevel);
+            };
+            requestAnimationFrame(checkLevel);
+        }
+
+        function applyPeerAudioSettings(peerId) {
+            const settings = userAudioSettings[peerId] || { muted: false, volume: 1 };
+            const audioNode = peerAudioNodes[peerId];
+            if (audioNode) {
+                audioNode.gain.gain.value = isDeafened || settings.muted ? 0 : settings.volume;
+            } else {
+                const videoEl = document.getElementById(`v-${peerId}`);
+                if (videoEl) {
+                    videoEl.muted = isDeafened || settings.muted;
+                    videoEl.volume = Math.min(1, settings.volume);
+                }
+            }
+        }
+
+        /* --- STAGE CARDS --- */
+        function renderSelfStageCard() { renderStageCard('local', username, avatarBase64, true); }
+        function renderRemoteStageCard(peerId) {
+            const meta = activePeerMetadata[peerId] || {};
+            renderStageCard(peerId, meta.user || peerId.substring(0,6), meta.avatar || '', false);
+        }
+
+        function renderStageCard(id, name, avatar, isSelf) {
+            let card = document.getElementById(`card-${id}`);
+            if (!card) {
+                card = document.createElement('div');
+                card.className = 'stage-card';
+                card.id = `card-${id}`;
+                card.onclick = () => toggleFocusStageCard(card);
+                card.onpointermove = () => showFullscreenControls(card);
+
+                const avatarContent = avatar ? `<img src="${avatar}">` : name.charAt(0).toUpperCase();
+
+                card.innerHTML = `
+                    <div class="stage-avatar-view" id="avatar-view-${id}">
+                        <div class="stage-avatar-circle" id="circle-${id}">${avatarContent}</div>
+                    </div>
+                    <video id="v-${id}" autoplay playsinline ${isSelf ? 'muted' : ''}></video>
+                    <div class="video-label" id="label-${id}">
+                        <span>${name}${isSelf ? ' (You)' : ''}</span>
+                    </div>
+                    <button class="fullscreen-btn" onclick="toggleFullscreen(event, 'v-${id}')">⛶</button>
+                    <div class="fullscreen-controls" onclick="event.stopPropagation()">
+                        <label class="fullscreen-volume" title="User volume">
+                            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06a9 9 0 0 0 0-17.54z"/></svg>
+                            <input type="range" class="modern-range fullscreen-volume-slider" data-peer-id="${id}" min="0" max="2" step="0.01" value="1" aria-label="User volume" oninput="changeStageVolume('${id}', this.value)" ${isSelf ? 'disabled' : ''}>
+                        </label>
+                        <button type="button" title="Exit fullscreen" aria-label="Exit fullscreen" onclick="exitStageFullscreen(event)">
+                            <svg viewBox="0 0 24 24"><path d="M5 5h5v2H7v3H5V5zm9 0h5v5h-2V7h-3V5zM5 14h2v3h3v2H5v-5zm12 3v-3h2v5h-5v-2h3z"/></svg>
+                        </button>
+                    </div>
+                `;
+                const stageVolumeSlider = card.querySelector('.fullscreen-volume-slider');
+                if (stageVolumeSlider) {
+                    const volume = userAudioSettings[id]?.volume ?? 1;
+                    stageVolumeSlider.value = volume;
+                    stageVolumeSlider.style.setProperty('--range-progress', `${volume * 50}%`);
+                }
+                videoGrid.appendChild(card);
+            } else {
+                updateStageCardUI(id);
+            }
+        }
+
+        function updateStageCardUI(id) {
+            const card = document.getElementById(`card-${id}`);
+            if (!card) return;
+
+            const isSelf = id === 'local';
+            const meta = isSelf ? { user: username, avatar: avatarBase64, videoType: activeVideoStreamType } : (activePeerMetadata[id] || {});
+            const name = meta.user || id.substring(0,6);
+            const avatar = meta.avatar || '';
+            const videoType = meta.videoType;
+
+            const circleEl = document.getElementById(`circle-${id}`);
+            if (circleEl) {
+                circleEl.innerHTML = avatar ? `<img src="${avatar}">` : name.charAt(0).toUpperCase();
+            }
+
+            const labelEl = document.getElementById(`label-${id}`);
+            if (labelEl) {
+                labelEl.innerHTML = `<span>${name}${isSelf ? ' (You)' : ''}${videoType ? ` (${videoType})` : ''}</span>`;
+            }
+
+            const videoEl = document.getElementById(`v-${id}`);
+            const avatarView = document.getElementById(`avatar-view-${id}`);
+
+            if (videoType) {
+                videoEl.classList.add('active');
+                avatarView.style.display = 'none';
+            } else {
+                videoEl.classList.remove('active');
+                avatarView.style.display = 'flex';
+            }
+        }
+
+        function removeStageCard(id) {
+            const card = document.getElementById(`card-${id}`);
+            if (card) card.remove();
+        }
+
+        function toggleFocusStageCard(card) {
+            const isFocused = card.classList.contains('focused');
+            document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('focused'));
+            if (!isFocused) {
+                card.classList.add('focused');
+                videoGrid.classList.add('focused-layout');
+            } else {
+                videoGrid.classList.remove('focused-layout');
+            }
+        }
+
+        /* --- CONTROLS --- */
+        micBtn.addEventListener('click', async () => {
+            try {
+                await ensureAudioStream();
+                isMuted = !isMuted;
+                localAudioTrack.enabled = !isMuted;
+                
+                micBtn.classList.toggle('active', isMuted);
+                micIconOn.style.display = isMuted ? 'none' : 'block';
+                micIconOff.style.display = isMuted ? 'block' : 'none';
+                if (isMuted) {
+                    peerSpeakingState.self = false;
+                    document.getElementById('card-local')?.classList.remove('speaking');
+                    peerListEl.querySelector('[data-peer-id="self"]')?.classList.remove('speaking');
+                }
+
+                if (!isMuted && isDeafened) deafenBtn.click();
+                playSound(isMuted ? 'mute' : 'unmute');
+                broadcastLocalAudioStatus();
+                updatePeerListUI();
+            } catch (err) {
+                appendSystemLog('Microphone Error: ' + err.message);
+            }
+        });
+
+        deafenBtn.addEventListener('click', () => {
+            isDeafened = !isDeafened;
+            deafenBtn.classList.toggle('active', isDeafened);
+            deafenIconOn.style.display = isDeafened ? 'none' : 'block';
+            deafenIconOff.style.display = isDeafened ? 'block' : 'none';
+
+            if (isDeafened && !isMuted) micBtn.click();
+            Object.keys(connections).forEach(applyPeerAudioSettings);
+            broadcastLocalAudioStatus();
+            updatePeerListUI();
+        });
+
+        webcamBtn.addEventListener('click', async () => {
+            if (activeVideoStreamType === 'Webcam') {
+                stopVideoTrack();
+            } else {
+                try {
+                    await ensureAudioStream();
+                    if (localVideoTrack) localVideoTrack.stop();
+                    
+                    const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    localVideoTrack = camStream.getVideoTracks()[0];
+                    activeVideoStreamType = 'Webcam';
+                    
+                    webcamBtn.classList.add('active');
+                    screenBtn.classList.remove('active');
+
+                    const localVideo = document.getElementById('v-local');
+                    localVideo.srcObject = getLocalCombinedStream();
+                    localVideo.muted = true;
+
+                    playSound('stream');
+                    updateStageCardUI('local');
+                    broadcast({ type: 'stream-status', videoType: activeVideoStreamType });
+                    renegotiateMediaTracks();
+                } catch (err) {
+                    appendSystemLog('Webcam Error: ' + err.message);
+                }
+            }
+        });
+
+        screenBtn.addEventListener('click', async () => {
+            if (activeVideoStreamType === 'Screen') {
+                stopVideoTrack();
+            } else {
+                try {
+                    await ensureAudioStream();
+                    if (localVideoTrack) localVideoTrack.stop();
+
+                    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                    localVideoTrack = screenStream.getVideoTracks()[0];
+                    activeVideoStreamType = 'Screen';
+
+                    screenBtn.classList.add('active');
+                    webcamBtn.classList.remove('active');
+
+                    localVideoTrack.onended = () => stopVideoTrack();
+
+                    const localVideo = document.getElementById('v-local');
+                    localVideo.srcObject = getLocalCombinedStream();
+                    localVideo.muted = true;
+
+                    playSound('stream');
+                    updateStageCardUI('local');
+                    broadcast({ type: 'stream-status', videoType: activeVideoStreamType });
+                    renegotiateMediaTracks();
+                } catch (err) {
+                    appendSystemLog('Screen Share Error: ' + err.message);
+                }
+            }
+        });
+
+        function stopVideoTrack() {
+            if (localVideoTrack) {
+                localVideoTrack.stop();
+                localVideoTrack = null;
+            }
+            activeVideoStreamType = null;
+            webcamBtn.classList.remove('active');
+            screenBtn.classList.remove('active');
+
+            const localVideo = document.getElementById('v-local');
+            localVideo.srcObject = getLocalCombinedStream();
+
+            updateStageCardUI('local');
+            broadcast({ type: 'stream-status', videoType: null });
+            renegotiateMediaTracks();
+        }
+
+        /* --- MEMBER LIST --- */
+        function updatePeerListUI() {
+            const crownSvg = `<svg class="crown-svg" width="14" height="14" viewBox="0 0 24 24" fill="var(--gold)"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>`;
+            const screenSvg = `<svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.11-.9-2-2-2H4c-1.11 0-2 .89-2 2v10c0 1.1.89 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`;
+            const deafSvg = `<svg class="status-deafened" title="Deafened" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-9 9v7c0 1.1.9 2 2 2h3v-8H5v-1a7 7 0 0 1 14 0v1h-3v8h3c1.1 0 2-.9 2-2v-7a9 9 0 0 0-9-9z"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2.5"/></svg>`;
+            const muteSvg = `<svg class="status-muted" title="Muted" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.27-1.48.42-2.31.42-2.76 0-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c1.39-.2 2.66-.78 3.68-1.61l3.05 3.05 1.27-1.27L4.27 3z"/></svg>`;
+
+            const totalMembers = Object.keys(connections).length + 1;
+            memberCountHeader.textContent = `Lobby Members (${totalMembers})`;
+
+            let selfIcons = '';
+            if (activeVideoStreamType === 'Screen') selfIcons += screenSvg;
+            if (isDeafened) selfIcons += deafSvg;
+            if (isMuted) selfIcons += muteSvg;
+
+            let html = `
+                <div class="member-item ${peerSpeakingState.self ? 'speaking' : ''}" data-peer-id="self" onclick="openOwnProfile(event)">
+                    <div class="member-avatar">${avatarBase64 ? `<img src="${avatarBase64}">` : username.charAt(0).toUpperCase()}</div>
+                    <div class="member-name">${username} (You) ${isHost ? crownSvg : ''}</div>
+                    <div class="member-status-icons">${selfIcons}</div>
+                </div>
+            `;
+
+            Object.values(connections).forEach(conn => {
+                const meta = activePeerMetadata[conn.peer] || {};
+                const pUser = meta.user || conn.peer.substring(0, 8);
+                const pAvatar = meta.avatar;
+                const isPeerHost = conn.peer === hostPeerId;
+                
+                let peerIcons = '';
+                if (meta.videoType === 'Screen') peerIcons += screenSvg;
+                const mutedByUser = !!userAudioSettings[conn.peer]?.muted;
+                if (meta.deafened) peerIcons += deafSvg;
+                if (meta.muted || mutedByUser) {
+                    const muteTitle = mutedByUser && meta.muted ? 'Muted by you; user microphone is muted' : mutedByUser ? 'Muted by you' : 'User microphone is muted';
+                    peerIcons += muteSvg.replace('title="Muted"', `title="${muteTitle}"`);
+                }
+
+                html += `
+                    <div class="member-item ${peerSpeakingState[conn.peer] ? 'speaking' : ''}" data-peer-id="${conn.peer}" onclick="openUserPopover(event, '${conn.peer}', '${pUser}', '${pAvatar}')">
+                        <div class="member-avatar">${pAvatar ? `<img src="${pAvatar}">` : pUser.charAt(0).toUpperCase()}</div>
+                        <div class="member-name">${pUser} ${isPeerHost ? crownSvg : ''}</div>
+                        <div class="member-status-icons">${peerIcons}</div>
+                    </div>
+                `;
+            });
+
+            peerListEl.innerHTML = html;
+        }
+
+        /* --- INVITE & HOST MODALS --- */
+        function openInviteModal() {
+            const inviteUrl = window.location.href;
+            document.getElementById('invite-url-input').value = inviteUrl;
+
+            const qrContainer = document.getElementById('qrcode-container');
+            qrContainer.innerHTML = '';
+            new QRCode(qrContainer, {
+                text: inviteUrl,
+                width: 140,
+                height: 140
+            });
+
+            document.getElementById('invite-modal').style.display = 'flex';
+        }
+
+        function closeInviteModal() { document.getElementById('invite-modal').style.display = 'none'; }
+        async function copyInviteUrl() {
+            const input = document.getElementById('invite-url-input');
+            input.select();
+            try {
+                await navigator.clipboard.writeText(input.value);
+                showNotice('Invite copied', 'The invite link is ready to share.');
+            } catch (error) {
+                const copied = document.execCommand('copy');
+                showNotice(copied ? 'Invite copied' : 'Copy unavailable', copied ? 'The invite link is ready to share.' : 'Select and copy the invite link manually.');
+            }
+        }
+
+        function openHostSettingsModal() {
+            document.getElementById('edit-room-name-input').value = currentRoomName;
+            document.getElementById('edit-room-pass-input').value = currentRoomPass;
+            document.getElementById('host-modal').style.display = 'flex';
+        }
+        function closeHostSettingsModal() { document.getElementById('host-modal').style.display = 'none'; }
+        function saveHostSettings() {
+            currentRoomName = document.getElementById('edit-room-name-input').value.trim() || currentRoomName;
+            currentRoomPass = document.getElementById('edit-room-pass-input').value.trim();
+            renderRoomTitle(currentRoomName);
+            updateUrlHash();
+            broadcast({ type: 'room-sync', name: currentRoomName, peers: Object.keys(connections), hostId: hostPeerId });
+            closeHostSettingsModal();
+        }
+
+        function closeFileWarningModal() {
+            document.getElementById('file-warning-modal').style.display = 'none';
+        }
+
+        /* --- USER SETTINGS POPOVER --- */
+        function openUserPopover(event, peerId, peerName, peerAvatar) {
+            event.stopPropagation();
+            activeTargetPeerForControl = peerId;
+            currentCardAvatarUrl = peerAvatar || '';
+            cardUsernameEl.textContent = peerName;
+            cardProfileSubtitle.textContent = 'Adjust this member\'s volume for your session.';
+            cardAvatarEl.innerHTML = peerAvatar ? `<img src="${peerAvatar}">` : peerName.charAt(0).toUpperCase();
+            cardEditOverlay.style.display = 'none';
+
+            muteWidgetRow.style.display = 'flex';
+            volWidgetRow.style.display = 'flex';
+            kickUserBtn.style.display = isHost ? 'block' : 'none';
+
+            const settings = userAudioSettings[peerId] || { muted: false, volume: 1.0 };
+            userMuteCheckbox.checked = settings.muted;
+            userVolumeSlider.value = settings.volume;
+            volPercentage.textContent = `${Math.round(settings.volume * 100)}%`;
+
+            popover.style.display = 'block';
+            userVolumeSlider.style.setProperty('--range-progress', `${settings.volume * 50}%`);
+            positionUserPopover(event.currentTarget.getBoundingClientRect());
+        }
+
+        function positionUserPopover(anchorRect) {
+            const margin = 8;
+            const width = popover.offsetWidth;
+            const height = popover.offsetHeight;
+            const leftOfAnchor = anchorRect.left - width - margin;
+            const rightOfAnchor = anchorRect.right + margin;
+            const left = leftOfAnchor >= margin
+                ? leftOfAnchor
+                : rightOfAnchor + width <= window.innerWidth - margin
+                    ? rightOfAnchor
+                    : Math.max(margin, Math.min(leftOfAnchor, window.innerWidth - width - margin));
+            const top = Math.max(margin, Math.min(anchorRect.top + (anchorRect.height - height) / 2, window.innerHeight - height - margin));
+            popover.style.left = `${left}px`;
+            popover.style.top = `${top}px`;
+        }
+
+        function openOwnProfile(event) {
+            event?.stopPropagation();
+            activeTargetPeerForControl = 'self';
+            currentCardAvatarUrl = avatarBase64;
+            cardUsernameEl.innerHTML = `<label class="profile-field-label" for="self-name-edit">Display name</label><input type="text" id="self-name-edit" value="${username}" style="padding:7px 8px; font-size:0.9rem;" onchange="saveSelfUsername(this.value)" onblur="saveSelfUsername(this.value)">`;
+            cardProfileSubtitle.textContent = 'Your profile is visible to everyone in this lobby.';
+            cardAvatarEl.innerHTML = `
+                <div onclick="event.stopPropagation(); document.getElementById('avatar-file-input').click()" title="Click to change avatar" style="width:100%;height:100%;cursor:pointer;position:relative;">
+                    ${avatarBase64 ? `<img src="${avatarBase64}">` : username.charAt(0).toUpperCase()}
+                    <div class="avatar-edit-overlay" style="display:flex;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    </div>
+                </div>
+            `;
+
+            muteWidgetRow.style.display = 'none';
+            volWidgetRow.style.display = 'none';
+            kickUserBtn.style.display = 'none';
+
+            popover.style.display = 'block';
+            userVolumeSlider.style.setProperty('--range-progress', '50%');
+            positionUserPopover(event?.currentTarget?.getBoundingClientRect() || document.querySelector('[data-peer-id="self"]').getBoundingClientRect());
+        }
+
+        function saveSelfUsername(newVal) {
+            const cleaned = newVal.trim();
+            if (cleaned && cleaned !== username) {
+                username = cleaned;
+                localStorage.setItem('p2p_username', username);
+                updateStageCardUI('local');
+                broadcast({ type: 'profile-update', user: username, avatar: avatarBase64 });
+                updatePeerListUI();
+            }
+        }
+
+        function toggleUserMute(isMuted) {
+            if (!activeTargetPeerForControl) return;
+            if (!userAudioSettings[activeTargetPeerForControl]) userAudioSettings[activeTargetPeerForControl] = { muted: false, volume: 1.0 };
+            userAudioSettings[activeTargetPeerForControl].muted = isMuted;
+            applyPeerAudioSettings(activeTargetPeerForControl);
+            updatePeerListUI();
+        }
+
+        function setPeerVolume(peerId, vol) {
+            if (!userAudioSettings[peerId]) userAudioSettings[peerId] = { muted: false, volume: 1.0 };
+            const volume = Math.max(0, Math.min(2, parseFloat(vol)));
+            userAudioSettings[peerId].volume = volume;
+            const popoverIsOpenForPeer = activeTargetPeerForControl === peerId;
+            if (popoverIsOpenForPeer) {
+                volPercentage.textContent = `${Math.round(volume * 100)}%`;
+                userVolumeSlider.value = volume;
+                userVolumeSlider.style.setProperty('--range-progress', `${volume * 50}%`);
+            }
+            document.querySelectorAll(`.fullscreen-volume-slider[data-peer-id="${CSS.escape(peerId)}"]`).forEach(slider => {
+                slider.value = volume;
+                slider.style.setProperty('--range-progress', `${volume * 50}%`);
+            });
+            applyPeerAudioSettings(peerId);
+        }
+
+        function changeUserVolume(vol) {
+            if (!activeTargetPeerForControl) return;
+            setPeerVolume(activeTargetPeerForControl, vol);
+        }
+
+        function changeStageVolume(peerId, vol) {
+            setPeerVolume(peerId, vol);
+        }
+
+        function kickActiveTargetUser() {
+            if (!isHost || !activeTargetPeerForControl) return;
+            const conn = connections[activeTargetPeerForControl];
+            if (conn && conn.open) conn.send({ type: 'kick' });
+            popover.style.display = 'none';
+        }
+
+        /* --- CROPPER --- */
+        function updateAvatarUI() {
+            if (avatarBase64) {
+                lobbyAvatarPreview.innerHTML = `<img src="${avatarBase64}">`;
+            } else {
+                lobbyAvatarInitial.textContent = username.charAt(0).toUpperCase();
+            }
+        }
+
+        function handleAvatarSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    cropImageObj = img;
+                    cropX = 0; cropY = 0; cropScale = 1;
+                    cropZoomSlider.value = 1;
+                    drawCropCanvas();
+                    cropModal.style.display = 'flex';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        function drawCropCanvas() {
+            if (!cropImageObj) return;
+            cropCtx.clearRect(0, 0, 1200, 1200);
+            cropCtx.save();
+            cropCtx.beginPath();
+            cropCtx.arc(600, 600, 560, 0, Math.PI * 2);
+            cropCtx.clip();
+            const w = cropImageObj.width * cropScale;
+            const h = cropImageObj.height * cropScale;
+            cropCtx.drawImage(cropImageObj, 600 - w/2 + cropX, 600 - h/2 + cropY, w, h);
+            cropCtx.restore();
+        }
+
+        function updateCropZoom(val) {
+            cropScale = parseFloat(val);
+            drawCropCanvas();
+        }
+
+        let lastX = 0, lastY = 0;
+        cropCanvas.addEventListener('mousedown', (e) => { cropDrag = true; lastX = e.clientX; lastY = e.clientY; });
+        window.addEventListener('mousemove', (e) => {
+            if (!cropDrag) return;
+            cropX += (e.clientX - lastX) * (1200 / cropCanvas.clientWidth);
+            cropY += (e.clientY - lastY) * (1200 / cropCanvas.clientHeight);
+            lastX = e.clientX; lastY = e.clientY;
+            drawCropCanvas();
+        });
+        window.addEventListener('mouseup', () => { cropDrag = false; });
+
+        function cancelCrop() {
+            cropModal.style.display = 'none';
+            cropImageObj = null;
+        }
+
+        function confirmCrop() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 1200; tempCanvas.height = 1200;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.beginPath();
+            tCtx.arc(600, 600, 600, 0, Math.PI * 2);
+            tCtx.clip();
+            const w = cropImageObj.width * cropScale;
+            const h = cropImageObj.height * cropScale;
+            tCtx.drawImage(cropImageObj, 600 - w/2 + cropX, 600 - h/2 + cropY, w, h);
+            
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = 2048; finalCanvas.height = 2048;
+            const fCtx = finalCanvas.getContext('2d');
+            fCtx.drawImage(tempCanvas, 0, 0, 2048, 2048);
+
+            avatarBase64 = finalCanvas.toDataURL('image/jpeg', 0.98);
+            localStorage.setItem('p2p_avatar', avatarBase64);
+            updateAvatarUI();
+            if (activeTargetPeerForControl === 'self') {
+                currentCardAvatarUrl = avatarBase64;
+                openOwnProfile();
+            }
+            
+            if (peer) {
+                updateStageCardUI('local');
+                broadcast({ type: 'profile-update', user: username, avatar: avatarBase64 });
+                updatePeerListUI();
+            }
+            cropModal.style.display = 'none';
+            cropImageObj = null;
+        }
+
+        /* --- CHAT MESSAGING & FILE SIZE GUARD --- */
+        function autoResizeTextarea(el) {
+            el.style.height = '38px';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
+
+        function appendSystemLog(msg) {
+            logEl.innerHTML += `<div class="system-msg"><em>> ${msg}</em></div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function scrollToMessage(msgId) {
+            const targetEl = document.getElementById(msgId);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetEl.classList.add('highlighted');
+                setTimeout(() => targetEl.classList.remove('highlighted'), 1200);
+            }
+        }
+
+        function appendChatMessage(user, avatar, htmlContent, rawText, msgId, isOwn, replyRef) {
+            const id = msgId || 'msg_' + Math.random().toString(36).substring(2, 9);
+            messageStore[id] = { user, rawText };
+            messageReactions[id] = {};
+
+            const msgEl = document.createElement('div');
+            msgEl.className = 'chat-msg';
+            msgEl.id = id;
+            
+            let replyHtml = '';
+            if (replyRef && messageStore[replyRef]) {
+                const target = messageStore[replyRef];
+                replyHtml = `<div class="reply-reference" onclick="scrollToMessage('${replyRef}')">↳ Replying to <strong>${target.user}</strong>: ${target.rawText}</div>`;
+            }
+
+            const showDelete = isOwn || isHost;
+            const actionsHtml = `
+                <div class="msg-actions">
+                    <button class="msg-action-btn" onclick="toggleReactionPicker(event, '${id}')" title="Add Reaction">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 14s1.5 2 4 2 4-2 4-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                    </button>
+                    <button class="msg-action-btn" onclick="startReplyMessage('${id}')" title="Reply">
+                        <svg viewBox="0 0 24 24"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>
+                    </button>
+                    ${isOwn ? `<button class="msg-action-btn" onclick="startEditMessage('${id}')" title="Edit"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>` : ''}
+                    ${showDelete ? `<button class="msg-action-btn" onclick="deleteMessageLocally('${id}')" title="Delete"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+                </div>
+            `;
+
+            msgEl.innerHTML = `
+                <div class="msg-avatar" onclick="openLightbox('${avatar || ''}')">${avatar ? `<img src="${avatar}">` : user.charAt(0).toUpperCase()}</div>
+                <div class="msg-content">
+                    ${replyHtml}
+                    <div class="msg-header"><span class="msg-username">${user}</span></div>
+                    <div class="msg-text" id="text-${id}">${htmlContent}</div>
+                    <div class="msg-reactions" id="reactions-${id}"></div>
+                </div>
+                ${actionsHtml}
+            `;
+            logEl.appendChild(msgEl);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function deleteMessageLocally(msgId) {
+            const el = document.getElementById(msgId);
+            if (el) el.remove();
+            broadcast({ type: 'delete-msg', msgId: msgId });
+        }
+
+        function startEditMessage(msgId) {
+            editingMessageId = msgId;
+            const target = messageStore[msgId];
+            if (target) {
+                messageInput.value = target.rawText.trim();
+                messageInput.focus();
+                autoResizeTextarea(messageInput);
+            }
+        }
+
+        function cancelEditMessage() {
+            editingMessageId = null;
+            messageInput.value = '';
+            messageInput.style.height = '38px';
+        }
+
+        function startReplyMessage(msgId) {
+            replyingToMsgId = msgId;
+            const target = messageStore[msgId];
+            if (target) {
+                replyTargetText.textContent = `Replying to ${target.user}: "${target.rawText}"`;
+                replyBar.style.display = 'flex';
+                messageInput.focus();
+            }
+        }
+
+        function cancelReply() {
+            replyingToMsgId = null;
+            replyBar.style.display = 'none';
+        }
+
+        function toggleReactionPicker(event, msgId) {
+            event.stopPropagation();
+            if (activeReactionMsgId === msgId && globalReactionPicker.classList.contains('active')) {
+                globalReactionPicker.classList.remove('active');
+                activeReactionMsgId = null;
+                return;
+            }
+            activeReactionMsgId = msgId;
+            const rect = event.currentTarget.getBoundingClientRect();
+            globalReactionPicker.classList.add('active');
+            const pickerRect = globalReactionPicker.getBoundingClientRect();
+            const topPos = rect.top >= pickerRect.height + 8
+                ? rect.top - pickerRect.height - 8
+                : Math.min(rect.bottom + 8, window.innerHeight - pickerRect.height - 8);
+            const leftPos = Math.max(8, Math.min(rect.left + rect.width / 2 - pickerRect.width / 2, window.innerWidth - pickerRect.width - 8));
+            globalReactionPicker.style.top = `${Math.max(8, topPos)}px`;
+            globalReactionPicker.style.left = `${leftPos}px`;
+        }
+
+        function submitReaction(emoji) {
+            if (!activeReactionMsgId) return;
+            toggleReactionOnMsg(activeReactionMsgId, emoji, username);
+            broadcast({ type: 'reaction', msgId: activeReactionMsgId, emoji: emoji, user: username });
+            globalReactionPicker.classList.remove('active');
+            activeReactionMsgId = null;
+        }
+
+        function toggleReactionOnMsg(msgId, emoji, reactorUser) {
+            if (!messageReactions[msgId]) messageReactions[msgId] = {};
+            if (!messageReactions[msgId][emoji]) messageReactions[msgId][emoji] = { count: 0, users: new Set() };
+
+            const rData = messageReactions[msgId][emoji];
+            if (rData.users.has(reactorUser)) {
+                rData.users.delete(reactorUser);
+                rData.count--;
+                if (rData.count <= 0) delete messageReactions[msgId][emoji];
+            } else {
+                rData.users.add(reactorUser);
+                rData.count++;
+            }
+            renderReactionsUI(msgId);
+        }
+
+        function renderReactionsUI(msgId) {
+            const container = document.getElementById(`reactions-${msgId}`);
+            if (!container) return;
+            const reactions = messageReactions[msgId];
+            let html = '';
+            Object.keys(reactions).forEach(emoji => {
+                const data = reactions[emoji];
+                if (data && data.count > 0) {
+                    const activeClass = data.users.has(username) ? 'reacted' : '';
+                    html += `<div class="reaction-badge ${activeClass}" onclick="activeReactionMsgId='${msgId}'; submitReaction('${emoji}')"><span>${emoji}</span><span>${data.count}</span></div>`;
                 }
             });
+            container.innerHTML = html;
         }
 
-        // Exit Room
-        exitRoomBtn.addEventListener('click', () => {
-            if(peer) peer.destroy();
-            if(myStream) myStream.getTracks().forEach(t => t.stop());
-            if(screenStream) screenStream.getTracks().forEach(t => t.stop());
-            activeConnections = {};
-            peersInRoom = {};
-            myStream = null;
-            screenStream = null;
-            isHost = false;
-            
-            roomView.classList.add('hidden');
-            landingView.classList.remove('hidden');
-            window.history.replaceState({}, document.title, window.location.pathname);
+        function showTypingIndicator(name) {
+            typingIndicator.textContent = `${name} is typing...`;
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => typingIndicator.textContent = '', 1500);
+        }
+
+        messageInput.addEventListener('input', () => broadcast({ type: 'typing' }));
+
+        function handleMessageKeyDown(e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (editingMessageId) cancelEditMessage();
+                else if (replyingToMsgId) cancelReply();
+                return;
+            }
+            if (e.key === 'ArrowUp' && messageInput.value === '' && myMessages.length > 0) {
+                e.preventDefault();
+                const lastMsg = myMessages[myMessages.length - 1];
+                editingMessageId = lastMsg.id;
+                messageInput.value = lastMsg.text.trim();
+                autoResizeTextarea(messageInput);
+                return;
+            }
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        }
+
+        sendBtn.addEventListener('click', () => {
+            const rawMessage = messageInput.value.trim();
+            if (rawMessage) {
+                if (editingMessageId) {
+                    const tEl = document.getElementById(`text-${editingMessageId}`);
+                    if (tEl) tEl.innerHTML = marked.parse(rawMessage);
+                    broadcast({ type: 'edit-chat', msgId: editingMessageId, message: rawMessage });
+                    const found = myMessages.find(m => m.id === editingMessageId);
+                    if (found) found.text = rawMessage;
+                    if (messageStore[editingMessageId]) messageStore[editingMessageId].rawText = rawMessage;
+                    editingMessageId = null;
+                } else {
+                    const msgId = 'msg_' + Math.random().toString(36).substring(2, 9);
+                    const replyRef = replyingToMsgId;
+                    broadcast({ type: 'chat', message: rawMessage, msgId: msgId, replyRef: replyRef });
+                    appendChatMessage(username, avatarBase64, marked.parse(rawMessage), rawMessage, msgId, true, replyRef);
+                    myMessages.push({ id: msgId, text: rawMessage });
+                    cancelReply();
+                }
+                messageInput.value = '';
+                messageInput.style.height = '38px';
+            }
         });
 
-        // Invite Modal Actions
-        shareInviteBtn.addEventListener('click', () => {
-            const inviteUrl = window.location.origin + window.location.pathname + "?invite=" + currentLobbyId;
-            inviteUrlInput.value = inviteUrl;
-            inviteQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(inviteUrl)}`;
-            inviteModal.classList.remove('hidden');
-        });
+        function toggleEmojiPicker() { emojiPicker.classList.toggle('active'); }
+        function insertEmoji(emoji) {
+            messageInput.value += emoji;
+            emojiPicker.classList.remove('active');
+            messageInput.focus();
+            autoResizeTextarea(messageInput);
+        }
 
-        copyInviteBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(inviteUrlInput.value);
-            copyInviteBtn.textContent = "Copied!";
-            setTimeout(() => { copyInviteBtn.textContent = "Copy"; }, 2000);
-        });
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
 
-        closeInviteModal.addEventListener('click', () => { inviteModal.classList.add('hidden'); });
+            // 50 MB File Size limit check
+            if (file.size > 50 * 1024 * 1024) {
+                document.getElementById('file-warning-modal').style.display = 'flex';
+                event.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const resizedDataUrl = e.target.result;
+                const msgId = 'msg_' + Math.random().toString(36).substring(2, 9);
+                const replyRef = replyingToMsgId;
+
+                let sizeStr = file.size < 1024 * 1024 ? Math.round(file.size / 1024) + ' KB' : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+
+                broadcast({
+                    type: 'file',
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSizeStr: sizeStr,
+                    fileData: resizedDataUrl,
+                    msgId: msgId,
+                    replyRef: replyRef
+                });
+
+                const fileCardHtml = `
+                    <div class="file-card">
+                        <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${sizeStr}</div>
+                            <a class="file-download-btn" href="${resizedDataUrl}" download="${file.name}">Download</a>
+                        </div>
+                    </div>
+                `;
+
+                if (file.type.startsWith('image/')) {
+                    appendChatMessage(username, avatarBase64, `<br><img class="media-preview" src="${resizedDataUrl}" alt="${file.name}" onclick="openLightbox('${resizedDataUrl}')">`, `Shared file: ${file.name}`, msgId, true, replyRef);
+                } else {
+                    appendChatMessage(username, avatarBase64, fileCardHtml, `Shared file: ${file.name}`, msgId, true, replyRef);
+                }
+                cancelReply();
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        function openLightbox(src) {
+            if (!src) return;
+            lightboxImg.src = src;
+            lightboxModal.style.display = 'flex';
+        }
+        function closeLightbox() { lightboxModal.style.display = 'none'; }
+        function openLightboxFromCard() { if (currentCardAvatarUrl) openLightbox(currentCardAvatarUrl); }
+        function toggleFullscreen(event, videoId) {
+            event.stopPropagation();
+            const videoEl = document.getElementById(videoId);
+            const stageCard = videoEl?.closest('.stage-card');
+            if (!stageCard) return;
+            if (stageCard.requestFullscreen) stageCard.requestFullscreen();
+            else if (stageCard.webkitRequestFullscreen) stageCard.webkitRequestFullscreen();
+        }
+
+        function exitStageFullscreen(event) {
+            event.stopPropagation();
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+
+        function showFullscreenControls(stageCard) {
+            if (document.fullscreenElement !== stageCard && document.webkitFullscreenElement !== stageCard) return;
+            stageCard.classList.add('controls-visible');
+            clearTimeout(fullscreenControlsTimer);
+            fullscreenControlsTimer = setTimeout(() => stageCard.classList.remove('controls-visible'), 2200);
+        }
+
+        function updateFullscreenControls() {
+            clearTimeout(fullscreenControlsTimer);
+            document.querySelectorAll('.stage-card').forEach(card => card.classList.remove('controls-visible'));
+            const stageCard = document.fullscreenElement || document.webkitFullscreenElement;
+            if (stageCard?.classList.contains('stage-card')) showFullscreenControls(stageCard);
+        }
+
+        document.addEventListener('fullscreenchange', updateFullscreenControls);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenControls);
     </script>
 </body>
 </html>
