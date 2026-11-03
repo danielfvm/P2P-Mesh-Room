@@ -19,7 +19,8 @@
                             accent: '#5865f2',
                             accentHover: '#4752c4',
                             green: '#23a55a',
-                            red: '#f23f43'
+                            red: '#f23f43',
+                            input: '#383a40'
                         }
                     }
                 }
@@ -34,26 +35,33 @@
 <body class="bg-discord-darker text-gray-100 h-screen flex flex-col overflow-hidden font-sans">
 
     <!-- LANDING / LOBBY SELECTION VIEW -->
-    <div id="landing-view" class="flex-1 flex items-center justify-center p-6 bg-discord-darker">
-        <div class="bg-discord-dark max-w-md w-full p-8 rounded-2xl shadow-2xl border border-gray-700/50 flex flex-col gap-6">
+    <div id="landing-view" class="flex-1 flex items-center justify-center p-6 bg-discord-darker overflow-y-auto">
+        <div class="bg-discord-dark max-w-md w-full p-8 rounded-2xl shadow-2xl border border-gray-700/50 flex flex-col gap-6 my-auto">
             <div class="text-center">
                 <h1 class="text-3xl font-bold tracking-tight text-white mb-2">P2P Rooms</h1>
                 <p class="text-gray-400 text-sm">Secure, decentralized voice, video & screen sharing.</p>
             </div>
 
             <!-- User Profile Setup -->
-            <div class="flex flex-col gap-2">
-                <label class="text-xs font-bold uppercase tracking-wider text-gray-400">Your Profile</label>
-                <div class="flex gap-3 items-center">
-                    <input type="text" id="username-input" placeholder="Enter username..." class="flex-1 bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                    <select id="avatar-select" class="bg-discord-darker border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                        <option value="🦊">🦊 Fox</option>
-                        <option value="🐱">🐱 Cat</option>
-                        <option value="🐶">🐶 Dog</option>
-                        <option value="🐼">🐼 Panda</option>
-                        <option value="🤖">🤖 Robot</option>
-                        <option value="👽">👽 Alien</option>
-                    </select>
+            <div class="flex flex-col gap-3">
+                <label class="text-xs font-bold uppercase tracking-wider text-gray-400">Your Profile & Avatar</label>
+                <div class="flex gap-4 items-center">
+                    <div id="avatar-preview-container" class="relative group w-16 h-16 rounded-full bg-discord-accent/20 border-2 border-discord-accent flex items-center justify-center text-3xl cursor-pointer overflow-hidden shadow-inner">
+                        <span id="avatar-display">🦊</span>
+                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs text-white font-medium">Edit</div>
+                        <input type="file" id="avatar-file-input" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+                    </div>
+                    <div class="flex-1 flex flex-col gap-2">
+                        <input type="text" id="username-input" placeholder="Enter username..." class="bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
+                        <div class="flex gap-2">
+                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🦊</button>
+                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🐱</button>
+                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🐶</button>
+                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🐼</button>
+                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🤖</button>
+                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">👽</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -102,7 +110,6 @@
             <div class="h-14 border-b border-gray-700/50 flex items-center justify-between px-6 bg-discord-darker/50">
                 <div class="flex items-center gap-3">
                     <span id="room-title-display" class="font-bold text-lg text-white">Lobby</span>
-                    <span class="text-xs bg-discord-accent/20 text-discord-accent px-2 py-0.5 rounded-full font-medium" id="room-id-badge">ID: ...</span>
                 </div>
                 <div class="flex items-center gap-3">
                     <button id="share-invite-btn" class="bg-discord-accent hover:bg-discord-accentHover text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition">
@@ -121,7 +128,7 @@
 
             <!-- Control Bar (Bottom Floating/Fixed) -->
             <div class="h-20 bg-discord-darker flex items-center justify-center gap-4 px-6 border-t border-gray-700/50">
-                <button id="toggle-mic" class="w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg" title="Toggle Mic">
+                <button id="toggle-mic" class="w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg relative" title="Toggle Mic">
                     <i class="fa-solid fa-microphone"></i>
                 </button>
                 <button id="toggle-cam" class="w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg" title="Toggle Camera">
@@ -133,14 +140,59 @@
             </div>
         </div>
 
-        <!-- Right Sidebar (Room Members - Full Right Column) -->
-        <div class="w-80 bg-discord-sidebar border-l border-gray-700/50 flex flex-col">
-            <div class="h-14 border-b border-gray-700/50 flex items-center px-4 font-bold text-sm tracking-wider uppercase text-gray-400">
+        <!-- Right Sidebar (Occupies Full Right Column: Members List + Chat Window) -->
+        <div class="w-80 bg-discord-sidebar border-l border-gray-700/50 flex flex-col h-full">
+            <!-- Room Members Section -->
+            <div class="h-12 border-b border-gray-700/50 flex items-center px-4 font-bold text-xs tracking-wider uppercase text-gray-400">
                 Room Members (<span id="member-count">0</span>)
             </div>
-            <div id="members-list" class="flex-1 p-4 overflow-y-auto flex flex-col gap-2">
+            <div id="members-list" class="max-h-48 overflow-y-auto p-2 flex flex-col gap-1 border-b border-gray-700/50">
                 <!-- Members listed here -->
             </div>
+
+            <!-- Chat Window Section -->
+            <div class="flex-1 flex flex-col min-h-0 bg-discord-darker/30">
+                <div class="h-10 px-4 flex items-center border-b border-gray-700/30 text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Room Chat
+                </div>
+                <!-- Chat Messages -->
+                <div id="chat-messages" class="flex-1 p-3 overflow-y-auto flex flex-col gap-3 text-sm">
+                    <!-- Messages injected here -->
+                </div>
+
+                <!-- Reply Preview Box -->
+                <div id="reply-preview-container" class="hidden px-3 py-1.5 bg-discord-dark border-t border-gray-700 flex items-center justify-between text-xs text-gray-400">
+                    <div id="reply-preview-text" class="truncate">Replying to user...</div>
+                    <button id="cancel-reply-btn" class="hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <!-- Chat Input Form -->
+                <div class="p-3 bg-discord-dark border-t border-gray-700/50">
+                    <form id="chat-form" class="flex gap-2">
+                        <input type="text" id="chat-input" placeholder="Message #lobby..." class="flex-1 bg-discord-input border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
+                        <button type="submit" class="bg-discord-accent hover:bg-discord-accentHover text-white px-3 py-2 rounded-lg text-sm transition">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROFILE MODAL (Click on any profile) -->
+    <div id="profile-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+        <div class="bg-discord-dark p-6 rounded-2xl max-w-sm w-full border border-gray-700 flex flex-col items-center gap-4 text-center relative">
+            <button id="close-profile-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div id="modal-profile-avatar" class="w-24 h-24 rounded-full bg-discord-accent/20 border-2 border-discord-accent flex items-center justify-center text-5xl overflow-hidden shadow-lg">
+                🦊
+            </div>
+            <div class="flex flex-col gap-1">
+                <h3 id="modal-profile-name" class="text-xl font-bold text-white">Username</h3>
+                <div id="modal-profile-badges" class="flex gap-2 justify-center mt-1">
+                    <!-- Badges for Host, Muted, etc. -->
+                </div>
+            </div>
+            <p id="modal-profile-desc" class="text-xs text-gray-400">Connected peer in current P2P mesh network.</p>
         </div>
     </div>
 
@@ -180,21 +232,23 @@
         let myPeerId = null;
         let myStream = null;
         let screenStream = null;
-        let activeConnections = {}; // peerId -> { conn, call, stream, username, avatar, isScreen }
-        let peersInRoom = {}; // peerId -> { username, avatar }
+        let activeConnections = {}; // peerId -> { conn, call, stream, username, avatar, isScreen, micMuted }
+        let peersInRoom = {}; // peerId -> { username, avatar, isHost, micMuted }
         let myUsername = "User_" + Math.floor(Math.random() * 1000);
-        let myAvatar = "🦊";
+        let myAvatar = "🦊"; // Can be emoji or image data URL
+        let isHost = false;
         let currentLobbyId = null;
         let currentLobbyName = "";
         let lobbyPassword = "";
-        let targetPasswordAttempt = "";
         let pendingJoinLobbyId = null;
+        let replyingTo = null; // { id, username, text }
 
         // DOM Elements
         const landingView = document.getElementById('landing-view');
         const roomView = document.getElementById('room-view');
         const usernameInput = document.getElementById('username-input');
-        const avatarSelect = document.getElementById('avatar-select');
+        const avatarDisplay = document.getElementById('avatar-display');
+        const avatarFileInput = document.getElementById('avatar-file-input');
         const createLobbyNameInput = document.getElementById('create-lobby-name');
         const createLobbyPassInput = document.getElementById('create-lobby-pass');
         const createLobbyBtn = document.getElementById('create-lobby-btn');
@@ -207,13 +261,26 @@
         const membersList = document.getElementById('members-list');
         const memberCount = document.getElementById('member-count');
         const roomTitleDisplay = document.getElementById('room-title-display');
-        const roomIdBadge = document.getElementById('room-id-badge');
         const exitRoomBtn = document.getElementById('exit-room-btn');
         const shareInviteBtn = document.getElementById('share-invite-btn');
 
         const toggleMicBtn = document.getElementById('toggle-mic');
         const toggleCamBtn = document.getElementById('toggle-cam');
         const toggleScreenBtn = document.getElementById('toggle-screen');
+
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const replyPreviewContainer = document.getElementById('reply-preview-container');
+        const replyPreviewText = document.getElementById('reply-preview-text');
+        const cancelReplyBtn = document.getElementById('cancel-reply-btn');
+
+        const profileModal = document.getElementById('profile-modal');
+        const modalProfileAvatar = document.getElementById('modal-profile-avatar');
+        const modalProfileName = document.getElementById('modal-profile-name');
+        const modalProfileBadges = document.getElementById('modal-profile-badges');
+        const modalProfileDesc = document.getElementById('modal-profile-desc');
+        const closeProfileModal = document.getElementById('close-profile-modal');
 
         const passwordModal = document.getElementById('password-modal');
         const modalPasswordInput = document.getElementById('modal-password-input');
@@ -229,7 +296,34 @@
         // Init Profile
         usernameInput.value = myUsername;
         usernameInput.addEventListener('input', (e) => { myUsername = e.target.value.trim() || "Anonymous"; });
-        avatarSelect.addEventListener('change', (e) => { myAvatar = e.target.value; });
+        
+        document.querySelectorAll('.preset-emoji').forEach(btn => {
+            btn.addEventListener('click', () => {
+                myAvatar = btn.textContent;
+                renderAvatarInput();
+            });
+        });
+
+        avatarFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    myAvatar = event.target.result; // Data URL for custom image
+                    renderAvatarInput();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function renderAvatarInput() {
+            if(myAvatar.startsWith('data:')) {
+                avatarDisplay.innerHTML = `<img src="${myAvatar}" class="w-full h-full object-cover rounded-full">`;
+            } else {
+                avatarDisplay.textContent = myAvatar;
+            }
+        }
+        renderAvatarInput();
 
         // Load History
         function getHistory() {
@@ -260,9 +354,7 @@
                         <button class="del-hist text-gray-500 hover:text-discord-red px-1" data-id="${l.id}"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 `;
-                div.querySelector('.join-hist').addEventListener('click', () => {
-                    joinLobby(l.id, l.name);
-                });
+                div.querySelector('.join-hist').addEventListener('click', () => { joinLobby(l.id); });
                 div.querySelector('.del-hist').addEventListener('click', (e) => {
                     e.stopPropagation();
                     let updated = getHistory().filter(item => item.id !== l.id);
@@ -292,8 +384,8 @@
         createLobbyBtn.addEventListener('click', () => {
             const name = createLobbyNameInput.value.trim() || "Unnamed Lobby";
             const pass = createLobbyPassInput.value;
-            // Generate secure random ID for the peer lobby coordinator/host
-            const randomLobbyId = 'lobby_' + Math.random().toString(36.25).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+            const randomLobbyId = 'lobby_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+            isHost = true;
             startLobby(randomLobbyId, name, pass, true);
         });
 
@@ -301,27 +393,24 @@
         joinCodeBtn.addEventListener('click', () => {
             const code = joinCodeInput.value.trim();
             if(!code) return alert("Please enter a valid invite code or lobby ID.");
+            isHost = false;
             joinLobby(code);
         });
 
-        function startLobby(lobbyId, name, password, isHost) {
+        function startLobby(lobbyId, name, password, hosting) {
             currentLobbyId = lobbyId;
             currentLobbyName = name;
             lobbyPassword = password || "";
+            isHost = hosting;
 
-            // Initialize PeerJS with random peer ID
-            peer = new Peer(null, {
-                debug: 1
-            });
+            peer = new Peer(null, { debug: 1 });
 
             peer.on('open', (id) => {
                 myPeerId = id;
                 if(isHost) {
-                    // Host sets up connection handler
                     setupPeerServer(true);
                     enterRoomUI();
                 } else {
-                    // Connect to host/lobby peer
                     connectToLobby(lobbyId);
                 }
             });
@@ -334,7 +423,6 @@
 
         function joinLobby(lobbyId) {
             pendingJoinLobbyId = lobbyId;
-            // First connect temporarily to check if password is required or query host metadata
             const tempPeer = new Peer();
             tempPeer.on('open', (id) => {
                 const conn = tempPeer.connect(lobbyId, { metadata: { type: 'AUTH_REQUEST', username: myUsername } });
@@ -355,7 +443,6 @@
                 setTimeout(() => {
                     if(!responded) {
                         tempPeer.destroy();
-                        // Fallback direct join if host doesn't support auth handshake middleware
                         startLobby(lobbyId, "Lobby", "", false);
                     }
                 }, 3000);
@@ -365,17 +452,15 @@
         submitPasswordBtn.addEventListener('click', () => {
             const pass = modalPasswordInput.value;
             passwordModal.classList.add('hidden');
-            // Join with password
             startLobbyWithPassword(pendingJoinLobbyId, pass);
         });
 
-        cancelPasswordBtn.addEventListener('click', () => {
-            passwordModal.classList.add('hidden');
-        });
+        cancelPasswordBtn.addEventListener('click', () => { passwordModal.classList.add('hidden'); });
 
         function startLobbyWithPassword(lobbyId, password) {
             currentLobbyId = lobbyId;
             lobbyPassword = password;
+            isHost = false;
             peer = new Peer();
             peer.on('open', (id) => {
                 myPeerId = id;
@@ -384,23 +469,19 @@
         }
 
         function connectToLobby(lobbyId, password = "") {
-            // Connect to lobby host
             const conn = peer.connect(lobbyId, {
-                metadata: { type: 'JOIN', username: myUsername, avatar: myAvatar, password: password }
+                metadata: { type: 'JOIN', username: myUsername, avatar: myAvatar, password: password, isHost: false, micMuted: !micEnabled }
             });
 
             conn.on('open', () => {
                 setupConnectionEvents(conn);
             });
 
-            conn.on('error', (err) => {
-                alert("Failed to connect to lobby.");
-            });
-
+            conn.on('error', () => { alert("Failed to connect to lobby."); });
             setupPeerServer(false);
         }
 
-        function setupPeerServer(isHost) {
+        function setupPeerServer(hosting) {
             peer.on('connection', (conn) => {
                 conn.on('data', (data) => {
                     if(data.type === 'AUTH_REQUEST') {
@@ -414,47 +495,51 @@
                             conn.send({ status: 'DENIED' });
                             return;
                         }
-                        // Accept peer
-                        activeConnections[conn.peer] = { conn, username: data.username, avatar: data.avatar };
-                        peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar };
+                        activeConnections[conn.peer] = { conn, username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
+                        peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
                         
-                        // Broadcast member list update & peer sync
                         broadcastPeersList();
                         updateMembersUI();
                         rebuildMediaGrid();
 
-                        // Call the new peer with our local stream if available
                         if(myStream) {
                             const call = peer.call(conn.peer, myStream, { metadata: { type: 'cam', username: myUsername, avatar: myAvatar } });
                             setupCallEvents(call, conn.peer);
                         }
                     } else if(data.type === 'PEERS_UPDATE') {
-                        // Update mesh peers list
                         data.peers.forEach(p => {
                             if(p.id !== peer.id && !activeConnections[p.id]) {
-                                connectToPeer(p.id, p.username, p.avatar);
+                                connectToPeer(p.id, p.username, p.avatar, p.isHost, p.micMuted);
                             }
                         });
                     } else if(data.type === 'USER_INFO') {
-                        peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar };
+                        peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
                         if(activeConnections[conn.peer]) {
                             activeConnections[conn.peer].username = data.username;
                             activeConnections[conn.peer].avatar = data.avatar;
+                            activeConnections[conn.peer] = Object.assign(activeConnections[conn.peer], data);
                         }
                         updateMembersUI();
                         rebuildMediaGrid();
+                    } else if(data.type === 'CHAT_MESSAGE') {
+                        appendChatMessage(data.message);
+                        // Forward chat to others if host
+                        if(isHost) {
+                            Object.keys(activeConnections).forEach(pid => {
+                                if(pid !== conn.peer && activeConnections[pid].conn && activeConnections[pid].conn.open) {
+                                    activeConnections[pid].conn.send(data);
+                                }
+                            });
+                        }
                     }
                 });
             });
 
             peer.on('call', (call) => {
-                // Answer incoming call with local stream (if any)
                 navigator.mediaDevices?.getUserMedia({ video: true, audio: true }).then(stream => {
                     myStream = stream;
                     call.answer(myStream);
-                }).catch(() => {
-                    call.answer(); // Answer without stream if permissions denied
-                });
+                }).catch(() => { call.answer(); });
 
                 setupCallEvents(call, call.peer, call.metadata);
             });
@@ -463,15 +548,15 @@
             saveHistory({ id: currentLobbyId, name: currentLobbyName });
         }
 
-        function connectToPeer(peerId, username, avatar) {
+        function connectToPeer(peerId, username, avatar, hostStatus, mutedStatus) {
             if(activeConnections[peerId]) return;
             const conn = peer.connect(peerId, {
-                metadata: { type: 'JOIN', username: myUsername, avatar: myAvatar, password: lobbyPassword }
+                metadata: { type: 'JOIN', username: myUsername, avatar: myAvatar, password: lobbyPassword, isHost: isHost, micMuted: !micEnabled }
             });
 
             conn.on('open', () => {
-                activeConnections[peerId] = { conn, username, avatar };
-                peersInRoom[peerId] = { username, avatar };
+                activeConnections[peerId] = { conn, username, avatar, isHost: hostStatus, micMuted: mutedStatus };
+                peersInRoom[peerId] = { username, avatar, isHost: hostStatus, micMuted: mutedStatus };
                 updateMembersUI();
                 rebuildMediaGrid();
 
@@ -483,27 +568,30 @@
         }
 
         function setupConnectionEvents(conn) {
-            activeConnections[conn.peer] = { conn, username: "Peer", avatar: "👤" };
+            activeConnections[conn.peer] = { conn, username: "Peer", avatar: "👤", isHost: false, micMuted: false };
             conn.on('data', (data) => {
                 if(data.type === 'PEERS_UPDATE') {
                     data.peers.forEach(p => {
                         if(p.id !== peer.id && !activeConnections[p.id]) {
-                            connectToPeer(p.id, p.username, p.avatar);
+                            connectToPeer(p.id, p.username, p.avatar, p.isHost, p.micMuted);
                         }
                     });
                 } else if(data.type === 'USER_INFO') {
-                    peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar };
+                    peersInRoom[conn.peer] = { username: data.username, avatar: data.avatar, isHost: data.isHost, micMuted: data.micMuted };
                     if(activeConnections[conn.peer]) {
                         activeConnections[conn.peer].username = data.username;
                         activeConnections[conn.peer].avatar = data.avatar;
+                        activeConnections[conn.peer].isHost = data.isHost;
+                        activeConnections[conn.peer].micMuted = data.micMuted;
                     }
                     updateMembersUI();
                     rebuildMediaGrid();
+                } else if(data.type === 'CHAT_MESSAGE') {
+                    appendChatMessage(data.message);
                 }
             });
 
-            // Send our info
-            conn.send({ type: 'USER_INFO', username: myUsername, avatar: myAvatar });
+            conn.send({ type: 'USER_INFO', username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled });
         }
 
         function setupCallEvents(call, peerId, metadata) {
@@ -511,7 +599,7 @@
             const avatar = metadata?.avatar || peersInRoom[peerId]?.avatar || "👤";
             const isScreen = metadata?.type === 'screen';
 
-            if(!peersInRoom[peerId]) peersInRoom[peerId] = { username, avatar };
+            if(!peersInRoom[peerId]) peersInRoom[peerId] = { username, avatar, isHost: false, micMuted: false };
 
             call.on('stream', (remoteStream) => {
                 activeConnections[peerId] = activeConnections[peerId] || {};
@@ -534,9 +622,11 @@
             const peerList = Object.keys(activeConnections).map(id => ({
                 id,
                 username: activeConnections[id].username,
-                avatar: activeConnections[id].avatar
+                avatar: activeConnections[id].avatar,
+                isHost: activeConnections[id].isHost,
+                micMuted: activeConnections[id].micMuted
             }));
-            peerList.push({ id: peer.id, username: myUsername, avatar: myAvatar });
+            peerList.push({ id: peer.id, username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled });
 
             Object.values(activeConnections).forEach(item => {
                 if(item.conn && item.conn.open) {
@@ -545,20 +635,137 @@
             });
         }
 
+        function broadcastUserInfo() {
+            const info = { type: 'USER_INFO', username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled };
+            Object.values(activeConnections).forEach(item => {
+                if(item.conn && item.conn.open) {
+                    item.conn.send(info);
+                }
+            });
+        }
+
         function enterRoomUI() {
             landingView.classList.add('hidden');
             roomView.classList.remove('hidden');
             roomTitleDisplay.textContent = currentLobbyName;
-            roomIdBadge.textContent = "Code: " + currentLobbyId;
             rebuildMediaGrid();
             updateMembersUI();
         }
+
+        // Chat functionality & replies
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            if(!text) return;
+
+            const msg = {
+                id: 'msg_' + Math.random().toString(36).substring(2, 9),
+                senderId: myPeerId || 'self',
+                senderName: myUsername,
+                avatar: myAvatar,
+                text: text,
+                replyTo: replyingTo ? { id: replyingTo.id, name: replyingTo.name, text: replyingTo.text } : null,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            appendChatMessage(msg);
+            
+            // Broadcast message
+            Object.values(activeConnections).forEach(item => {
+                if(item.conn && item.conn.open) {
+                    item.conn.send({ type: 'CHAT_MESSAGE', message: msg });
+                }
+            });
+
+            chatInput.value = '';
+            clearReply();
+        });
+
+        function appendChatMessage(msg) {
+            const div = document.createElement('div');
+            div.className = "flex flex-col gap-1 group";
+            
+            let replyHtml = '';
+            if(msg.replyTo) {
+                replyHtml = `<div class="text-xs text-gray-500 border-l-2 border-discord-accent pl-2 italic">Replying to ${msg.replyTo.name}: "${msg.replyTo.text}"</div>`;
+            }
+
+            const avatarHtml = msg.avatar.startsWith('data:') ? `<img src="${msg.avatar}" class="w-7 h-7 rounded-full object-cover">` : `<span class="text-lg">${msg.avatar}</span>`;
+
+            div.innerHTML = `
+                ${replyHtml}
+                <div class="flex items-start gap-2.5">
+                    <div class="w-7 h-7 rounded-full bg-discord-accent/20 flex items-center justify-center overflow-hidden flex-shrink-0">${avatarHtml}</div>
+                    <div class="flex-1 flex flex-col">
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-xs text-white">${msg.senderName}</span>
+                            <span class="text-[10px] text-gray-500">${msg.timestamp}</span>
+                        </div>
+                        <p class="text-sm text-gray-300 break-words">${escapeHtml(msg.text)}</p>
+                    </div>
+                    <button class="reply-btn opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white text-xs px-1" title="Reply"><i class="fa-solid fa-reply"></i></button>
+                </div>
+            `;
+
+            div.querySelector('.reply-btn').addEventListener('click', () => {
+                setReply({ id: msg.id, name: msg.senderName, text: msg.text });
+            });
+
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function setReply(msg) {
+            replyingTo = msg;
+            reply-preview-text = `Replying to ${msg.name}: "${msg.text}"`;
+            document.getElementById('reply-preview-text').textContent = `Replying to ${msg.name}: "${msg.text}"`;
+            replyPreviewContainer.classList.remove('hidden');
+            chatInput.focus();
+        }
+
+        function clearReply() {
+            replyingTo = null;
+            replyPreviewContainer.classList.add('hidden');
+        }
+
+        cancelReplyBtn.addEventListener('click', clearReply);
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Profile Modal Inspection
+        function openProfileModal(user) {
+            modalProfileName.textContent = user.username;
+            if(user.avatar.startsWith('data:')) {
+                modalProfileAvatar.innerHTML = `<img src="${user.avatar}" class="w-full h-full object-cover">`;
+            } else {
+                modalProfileAvatar.textContent = user.avatar;
+            }
+
+            modalProfileBadges.innerHTML = '';
+            if(user.isHost) {
+                modalProfileBadges.innerHTML += `<span class="bg-yellow-500/20 text-yellow-400 text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"><i class="fa-solid fa-crown"></i> Host</span>`;
+            } else {
+                modalProfileBadges.innerHTML += `<span class="bg-blue-500/20 text-blue-400 text-xs px-2.5 py-1 rounded-full font-medium">Participant</span>`;
+            }
+
+            if(user.micMuted) {
+                modalProfileBadges.innerHTML += `<span class="bg-red-500/20 text-red-400 text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"><i class="fa-solid fa-microphone-slash"></i> Muted</span>`;
+            } else {
+                modalProfileBadges.innerHTML += `<span class="bg-green-500/20 text-green-400 text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"><i class="fa-solid fa-microphone"></i> Unmuted</span>`;
+            }
+
+            profileModal.classList.remove('hidden');
+        }
+
+        closeProfileModal.addEventListener('click', () => { profileModal.classList.add('hidden'); });
 
         // UI Updates & Grid Management (Discord Style Tiles)
         function rebuildMediaGrid() {
             mediaGrid.innerHTML = '';
 
-            // Collect all participants: Self + Active Connections
             const participants = [];
             participants.push({
                 id: myPeerId || 'self',
@@ -566,7 +773,9 @@
                 avatar: myAvatar,
                 stream: screenStream || myStream,
                 isScreen: !!screenStream,
-                isSelf: true
+                isSelf: true,
+                isHost: isHost,
+                micMuted: !micEnabled
             });
 
             Object.keys(activeConnections).forEach(id => {
@@ -577,41 +786,50 @@
                     avatar: conn.avatar || "👤",
                     stream: conn.stream,
                     isScreen: conn.isScreen,
-                    isSelf: false
+                    isSelf: false,
+                    isHost: conn.isHost,
+                    micMuted: conn.micMuted
                 });
             });
 
             participants.forEach(p => {
                 const tile = document.createElement('div');
-                tile.className = "bg-discord-darker rounded-xl overflow-hidden relative flex flex-col items-center justify-center border border-gray-700/50 aspect-video shadow-lg";
+                tile.className = "bg-discord-darker rounded-xl overflow-hidden relative flex flex-col items-center justify-center border border-gray-700/50 aspect-video shadow-lg cursor-pointer group";
+                tile.addEventListener('click', () => {
+                    openProfileModal({ username: p.username.replace(" (You)", ""), avatar: p.avatar, isHost: p.isHost, micMuted: p.micMuted });
+                });
 
                 if (p.stream && p.stream.getVideoTracks().length > 0) {
                     const video = document.createElement('video');
                     video.srcObject = p.stream;
                     video.autoplay = true;
                     video.playsInline = true;
-                    if (p.isSelf && !p.isScreen) video.muted = true; // Prevent local mic echo feedback loop
-                    // Prevent feedback loop for screenshare audio if broadcaster hears own audio
-                    if (p.isSelf && p.isScreen) video.muted = true; 
+                    if (p.isSelf || p.isScreen) video.muted = true; // Feedback loop preventer
                     video.className = "w-full h-full object-cover";
                     tile.appendChild(video);
 
-                    // Username overlay badge
                     const badge = document.createElement('div');
                     badge.className = "absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-lg text-xs font-medium text-white flex items-center gap-2";
-                    badge.innerHTML = `<span>${p.avatar}</span><span>${p.username}</span>`;
+                    const avatarHtml = p.avatar.startsWith('data:') ? `<img src="${p.avatar}" class="w-4 h-4 rounded-full object-cover">` : `<span>${p.avatar}</span>`;
+                    const hostIcon = p.isHost ? `<i class="fa-solid fa-crown text-yellow-400 ml-1" title="Host"></i>` : '';
+                    const mutedIcon = p.micMuted ? `<i class="fa-solid fa-microphone-slash text-red-400 ml-1" title="Muted"></i>` : '';
+                    badge.innerHTML = `${avatarHtml}<span>${p.username}</span>${hostIcon}${mutedIcon}`;
                     tile.appendChild(badge);
                 } else {
-                    // Fallback profile avatar tile when not streaming/sharing
                     const avatarContainer = document.createElement('div');
                     avatarContainer.className = "flex flex-col items-center justify-center gap-3";
-                    avatarContainer.innerHTML = `
-                        <div class="w-20 h-20 rounded-full bg-discord-accent/20 flex items-center justify-center text-4xl shadow-inner border border-discord-accent/40">
-                            ${p.avatar}
+                    const avatarHtml = p.avatar.startsWith('data:') ? `<img src="${p.avatar}" class="w-full h-full object-cover">` : `<span>${p.avatar}</span>`;
+                    const hostBadge = p.isHost ? `<span class="absolute top-3 right-3 bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Host</span>` : '';
+                    const mutedBadge = p.micMuted ? `<span class="absolute top-3 left-3 bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1"><i class="fa-solid fa-microphone-slash"></i></span>` : '';
+
+                    tile.innerHTML = `
+                        ${hostBadge}
+                        ${mutedBadge}
+                        <div class="w-20 h-20 rounded-full bg-discord-accent/20 flex items-center justify-center text-4xl shadow-inner border border-discord-accent/40 overflow-hidden">
+                            ${avatarHtml}
                         </div>
                         <span class="font-semibold text-sm text-gray-200">${p.username}</span>
                     `;
-                    tile.appendChild(avatarContainer);
                 }
 
                 mediaGrid.appendChild(tile);
@@ -623,16 +841,35 @@
             
             // Add self
             const selfDiv = document.createElement('div');
-            selfDiv.className = "flex items-center gap-3 p-2 rounded-lg bg-discord-dark/40";
-            selfDiv.innerHTML = `<span class="text-xl">${myAvatar}</span><span class="text-sm font-medium text-white truncate flex-1">${myUsername} (You)</span>`;
+            selfDiv.className = "flex items-center gap-3 p-2 rounded-lg bg-discord-dark/40 cursor-pointer hover:bg-discord-dark transition";
+            const selfAvatarHtml = myAvatar.startsWith('data:') ? `<img src="${myAvatar}" class="w-6 h-6 rounded-full object-cover">` : `<span class="text-lg">${myAvatar}</span>`;
+            selfDiv.innerHTML = `
+                <div class="w-6 h-6 rounded-full flex items-center justify-center overflow-hidden">${selfAvatarHtml}</div>
+                <span class="text-xs font-medium text-white truncate flex-1">${myUsername} (You)</span>
+                ${isHost ? '<i class="fa-solid fa-crown text-yellow-400 text-xs" title="Host"></i>' : ''}
+                ${!micEnabled ? '<i class="fa-solid fa-microphone-slash text-red-400 text-xs" title="Muted"></i>' : ''}
+            `;
+            selfDiv.addEventListener('click', () => {
+                openProfileModal({ username: myUsername, avatar: myAvatar, isHost: isHost, micMuted: !micEnabled });
+            });
             membersList.appendChild(selfDiv);
 
             // Add peers
             Object.keys(activeConnections).forEach(id => {
                 const conn = activeConnections[id];
                 const div = document.createElement('div');
-                div.className = "flex items-center gap-3 p-2 rounded-lg hover:bg-discord-dark/20 transition";
-                div.innerHTML = `<span class="text-xl">${conn.avatar || '👤'}</span><span class="text-sm font-medium text-gray-300 truncate flex-1">${conn.username || 'User'}</span>`;
+                div.className = "flex items-center gap-3 p-2 rounded-lg hover:bg-discord-dark/20 transition cursor-pointer";
+                const peerAvatar = conn.avatar || '👤';
+                const peerAvatarHtml = peerAvatar.startsWith('data:') ? `<img src="${peerAvatar}" class="w-6 h-6 rounded-full object-cover">` : `<span class="text-lg">${peerAvatar}</span>`;
+                div.innerHTML = `
+                    <div class="w-6 h-6 rounded-full flex items-center justify-center overflow-hidden">${peerAvatarHtml}</div>
+                    <span class="text-xs font-medium text-gray-300 truncate flex-1">${conn.username || 'User'}</span>
+                    ${conn.isHost ? '<i class="fa-solid fa-crown text-yellow-400 text-xs" title="Host"></i>' : ''}
+                    ${conn.micMuted ? '<i class="fa-solid fa-microphone-slash text-red-400 text-xs" title="Muted"></i>' : ''}
+                `;
+                div.addEventListener('click', () => {
+                    openProfileModal({ username: conn.username, avatar: peerAvatar, isHost: conn.isHost, micMuted: conn.micMuted });
+                });
                 membersList.appendChild(div);
             });
 
@@ -659,6 +896,10 @@
                 ? "w-12 h-12 rounded-full bg-discord-sidebar hover:bg-gray-600 flex items-center justify-center text-white transition text-lg"
                 : "w-12 h-12 rounded-full bg-discord-red hover:bg-red-600 flex items-center justify-center text-white transition text-lg";
             toggleMicBtn.innerHTML = micEnabled ? '<i class="fa-solid fa-microphone"></i>' : '<i class="fa-solid fa-microphone-slash"></i>';
+            
+            broadcastUserInfo();
+            updateMembersUI();
+            rebuildMediaGrid();
         });
 
         toggleCamBtn.addEventListener('click', async () => {
@@ -685,7 +926,6 @@
                 if(!screenStream) {
                     screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                     
-                    // Handle stream stop by user browser sharing UI button
                     screenStream.getVideoTracks()[0].onended = () => {
                         stopScreenShare();
                     };
@@ -729,6 +969,7 @@
             peersInRoom = {};
             myStream = null;
             screenStream = null;
+            isHost = false;
             
             roomView.classList.add('hidden');
             landingView.classList.remove('hidden');
@@ -749,9 +990,7 @@
             setTimeout(() => { copyInviteBtn.textContent = "Copy"; }, 2000);
         });
 
-        closeInviteModal.addEventListener('click', () => {
-            inviteModal.classList.add('hidden');
-        });
+        closeInviteModal.addEventListener('click', () => { inviteModal.classList.add('hidden'); });
     </script>
 </body>
 </html>
