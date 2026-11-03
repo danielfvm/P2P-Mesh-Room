@@ -46,21 +46,14 @@
             <div class="flex flex-col gap-3">
                 <label class="text-xs font-bold uppercase tracking-wider text-gray-400">Your Profile & Avatar</label>
                 <div class="flex gap-4 items-center">
-                    <div id="avatar-preview-container" class="relative group w-16 h-16 rounded-full bg-discord-accent/20 border-2 border-discord-accent flex items-center justify-center text-3xl cursor-pointer overflow-hidden shadow-inner">
-                        <span id="avatar-display">🦊</span>
-                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs text-white font-medium">Edit</div>
+                    <div id="avatar-preview-container" class="relative group w-16 h-16 rounded-full bg-discord-accent text-white flex items-center justify-center text-2xl font-bold cursor-pointer overflow-hidden shadow-inner">
+                        <span id="avatar-display">U</span>
+                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs text-white font-medium">Upload</div>
                         <input type="file" id="avatar-file-input" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
                     </div>
                     <div class="flex-1 flex flex-col gap-2">
                         <input type="text" id="username-input" placeholder="Enter username..." class="bg-discord-darker border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-discord-accent text-white">
-                        <div class="flex gap-2">
-                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🦊</button>
-                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🐱</button>
-                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🐶</button>
-                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🐼</button>
-                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">🤖</button>
-                            <button type="button" class="preset-emoji text-lg hover:scale-110 transition">👽</button>
-                        </div>
+                        <span class="text-[11px] text-gray-400">Avatar defaults to the first letter of your username or custom uploaded image.</span>
                     </div>
                 </div>
             </div>
@@ -183,8 +176,8 @@
     <div id="profile-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
         <div class="bg-discord-dark p-6 rounded-2xl max-w-sm w-full border border-gray-700 flex flex-col items-center gap-4 text-center relative">
             <button id="close-profile-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <div id="modal-profile-avatar" class="w-24 h-24 rounded-full bg-discord-accent/20 border-2 border-discord-accent flex items-center justify-center text-5xl overflow-hidden shadow-lg">
-                🦊
+            <div id="modal-profile-avatar" class="w-24 h-24 rounded-full bg-discord-accent text-white border-2 border-discord-accent flex items-center justify-center text-3xl font-bold overflow-hidden shadow-lg">
+                U
             </div>
             <div class="flex flex-col gap-1">
                 <h3 id="modal-profile-name" class="text-xl font-bold text-white">Username</h3>
@@ -235,7 +228,7 @@
         let activeConnections = {}; // peerId -> { conn, call, stream, username, avatar, isScreen, micMuted }
         let peersInRoom = {}; // peerId -> { username, avatar, isHost, micMuted }
         let myUsername = "User_" + Math.floor(Math.random() * 1000);
-        let myAvatar = "🦊"; // Can be emoji or image data URL
+        let myAvatar = ""; // Custom uploaded image URL or empty to use letter avatar
         let isHost = false;
         let currentLobbyId = null;
         let currentLobbyName = "";
@@ -295,13 +288,9 @@
 
         // Init Profile
         usernameInput.value = myUsername;
-        usernameInput.addEventListener('input', (e) => { myUsername = e.target.value.trim() || "Anonymous"; });
-        
-        document.querySelectorAll('.preset-emoji').forEach(btn => {
-            btn.addEventListener('click', () => {
-                myAvatar = btn.textContent;
-                renderAvatarInput();
-            });
+        usernameInput.addEventListener('input', (e) => { 
+            myUsername = e.target.value.trim() || "Anonymous"; 
+            renderAvatarInput();
         });
 
         avatarFileInput.addEventListener('change', (e) => {
@@ -317,13 +306,23 @@
         });
 
         function renderAvatarInput() {
-            if(myAvatar.startsWith('data:')) {
+            if(myAvatar && myAvatar.startsWith('data:')) {
                 avatarDisplay.innerHTML = `<img src="${myAvatar}" class="w-full h-full object-cover rounded-full">`;
             } else {
-                avatarDisplay.textContent = myAvatar;
+                const firstLetter = (myUsername || "U").charAt(0).toUpperCase();
+                avatarDisplay.innerHTML = `<span class="text-white text-xl font-bold">${firstLetter}</span>`;
             }
         }
         renderAvatarInput();
+
+        function renderAvatarHTML(avatarStr, username, sizeClass = "w-7 h-7 text-xs") {
+            if(avatarStr && avatarStr.startsWith('data:')) {
+                return `<div class="${sizeClass} rounded-full overflow-hidden flex-shrink-0 bg-discord-accent"><img src="${avatarStr}" class="w-full h-full object-cover"></div>`;
+            } else {
+                const letter = (username || "U").charAt(0).toUpperCase();
+                return `<div class="${sizeClass} rounded-full flex items-center justify-center font-bold text-white bg-discord-accent flex-shrink-0">${letter}</div>`;
+            }
+        }
 
         // Load History
         function getHistory() {
@@ -523,7 +522,6 @@
                         rebuildMediaGrid();
                     } else if(data.type === 'CHAT_MESSAGE') {
                         appendChatMessage(data.message);
-                        // Forward chat to others if host
                         if(isHost) {
                             Object.keys(activeConnections).forEach(pid => {
                                 if(pid !== conn.peer && activeConnections[pid].conn && activeConnections[pid].conn.open) {
@@ -568,7 +566,7 @@
         }
 
         function setupConnectionEvents(conn) {
-            activeConnections[conn.peer] = { conn, username: "Peer", avatar: "👤", isHost: false, micMuted: false };
+            activeConnections[conn.peer] = { conn, username: "Peer", avatar: "", isHost: false, micMuted: false };
             conn.on('data', (data) => {
                 if(data.type === 'PEERS_UPDATE') {
                     data.peers.forEach(p => {
@@ -596,7 +594,7 @@
 
         function setupCallEvents(call, peerId, metadata) {
             const username = metadata?.username || peersInRoom[peerId]?.username || "User";
-            const avatar = metadata?.avatar || peersInRoom[peerId]?.avatar || "👤";
+            const avatar = metadata?.avatar || peersInRoom[peerId]?.avatar || "";
             const isScreen = metadata?.type === 'screen';
 
             if(!peersInRoom[peerId]) peersInRoom[peerId] = { username, avatar, isHost: false, micMuted: false };
@@ -670,7 +668,6 @@
 
             appendChatMessage(msg);
             
-            // Broadcast message
             Object.values(activeConnections).forEach(item => {
                 if(item.conn && item.conn.open) {
                     item.conn.send({ type: 'CHAT_MESSAGE', message: msg });
@@ -690,12 +687,12 @@
                 replyHtml = `<div class="text-xs text-gray-500 border-l-2 border-discord-accent pl-2 italic">Replying to ${msg.replyTo.name}: "${msg.replyTo.text}"</div>`;
             }
 
-            const avatarHtml = msg.avatar.startsWith('data:') ? `<img src="${msg.avatar}" class="w-7 h-7 rounded-full object-cover">` : `<span class="text-lg">${msg.avatar}</span>`;
+            const avatarElHtml = renderAvatarHTML(msg.avatar, msg.senderName, "w-7 h-7 text-xs");
 
             div.innerHTML = `
                 ${replyHtml}
                 <div class="flex items-start gap-2.5">
-                    <div class="w-7 h-7 rounded-full bg-discord-accent/20 flex items-center justify-center overflow-hidden flex-shrink-0">${avatarHtml}</div>
+                    ${avatarElHtml}
                     <div class="flex-1 flex flex-col">
                         <div class="flex items-center gap-2">
                             <span class="font-semibold text-xs text-white">${msg.senderName}</span>
@@ -717,8 +714,7 @@
 
         function setReply(msg) {
             replyingTo = msg;
-            reply-preview-text = `Replying to ${msg.name}: "${msg.text}"`;
-            document.getElementById('reply-preview-text').textContent = `Replying to ${msg.name}: "${msg.text}"`;
+            replyPreviewText.textContent = `Replying to ${msg.name}: "${msg.text}"`;
             replyPreviewContainer.classList.remove('hidden');
             chatInput.focus();
         }
@@ -738,10 +734,12 @@
         // Profile Modal Inspection
         function openProfileModal(user) {
             modalProfileName.textContent = user.username;
-            if(user.avatar.startsWith('data:')) {
+            
+            if(user.avatar && user.avatar.startsWith('data:')) {
                 modalProfileAvatar.innerHTML = `<img src="${user.avatar}" class="w-full h-full object-cover">`;
             } else {
-                modalProfileAvatar.textContent = user.avatar;
+                const firstLetter = (user.username || "U").charAt(0).toUpperCase();
+                modalProfileAvatar.innerHTML = `<span class="text-white text-3xl font-bold">${firstLetter}</span>`;
             }
 
             modalProfileBadges.innerHTML = '';
@@ -783,7 +781,7 @@
                 participants.push({
                     id: id,
                     username: conn.username || "User",
-                    avatar: conn.avatar || "👤",
+                    avatar: conn.avatar || "",
                     stream: conn.stream,
                     isScreen: conn.isScreen,
                     isSelf: false,
@@ -810,25 +808,26 @@
 
                     const badge = document.createElement('div');
                     badge.className = "absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-lg text-xs font-medium text-white flex items-center gap-2";
-                    const avatarHtml = p.avatar.startsWith('data:') ? `<img src="${p.avatar}" class="w-4 h-4 rounded-full object-cover">` : `<span>${p.avatar}</span>`;
+                    const avatarHtmlMini = renderAvatarHTML(p.avatar, p.username, "w-4 h-4 text-[10px]");
                     const hostIcon = p.isHost ? `<i class="fa-solid fa-crown text-yellow-400 ml-1" title="Host"></i>` : '';
                     const mutedIcon = p.micMuted ? `<i class="fa-solid fa-microphone-slash text-red-400 ml-1" title="Muted"></i>` : '';
-                    badge.innerHTML = `${avatarHtml}<span>${p.username}</span>${hostIcon}${mutedIcon}`;
+                    badge.innerHTML = `${avatarHtmlMini}<span>${p.username}</span>${hostIcon}${mutedIcon}`;
                     tile.appendChild(badge);
                 } else {
-                    const avatarContainer = document.createElement('div');
-                    avatarContainer.className = "flex flex-col items-center justify-center gap-3";
-                    const avatarHtml = p.avatar.startsWith('data:') ? `<img src="${p.avatar}" class="w-full h-full object-cover">` : `<span>${p.avatar}</span>`;
                     const hostBadge = p.isHost ? `<span class="absolute top-3 right-3 bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1"><i class="fa-solid fa-crown"></i> Host</span>` : '';
                     const mutedBadge = p.micMuted ? `<span class="absolute top-3 left-3 bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1"><i class="fa-solid fa-microphone-slash"></i></span>` : '';
+
+                    const letterOrAvatar = (p.avatar && p.avatar.startsWith('data:')) 
+                        ? `<div class="w-20 h-20 rounded-full overflow-hidden shadow-inner border border-discord-accent/40 bg-discord-accent"><img src="${p.avatar}" class="w-full h-full object-cover"></div>`
+                        : `<div class="w-20 h-20 rounded-full bg-discord-accent flex items-center justify-center text-3xl font-bold text-white shadow-inner border border-discord-accent/40">${(p.username || "U").charAt(0).toUpperCase()}</div>`;
 
                     tile.innerHTML = `
                         ${hostBadge}
                         ${mutedBadge}
-                        <div class="w-20 h-20 rounded-full bg-discord-accent/20 flex items-center justify-center text-4xl shadow-inner border border-discord-accent/40 overflow-hidden">
-                            ${avatarHtml}
+                        <div class="flex flex-col items-center justify-center gap-3">
+                            ${letterOrAvatar}
+                            <span class="font-semibold text-sm text-gray-200">${p.username}</span>
                         </div>
-                        <span class="font-semibold text-sm text-gray-200">${p.username}</span>
                     `;
                 }
 
@@ -842,9 +841,9 @@
             // Add self
             const selfDiv = document.createElement('div');
             selfDiv.className = "flex items-center gap-3 p-2 rounded-lg bg-discord-dark/40 cursor-pointer hover:bg-discord-dark transition";
-            const selfAvatarHtml = myAvatar.startsWith('data:') ? `<img src="${myAvatar}" class="w-6 h-6 rounded-full object-cover">` : `<span class="text-lg">${myAvatar}</span>`;
+            const selfAvatarEl = renderAvatarHTML(myAvatar, myUsername, "w-6 h-6 text-xs");
             selfDiv.innerHTML = `
-                <div class="w-6 h-6 rounded-full flex items-center justify-center overflow-hidden">${selfAvatarHtml}</div>
+                ${selfAvatarEl}
                 <span class="text-xs font-medium text-white truncate flex-1">${myUsername} (You)</span>
                 ${isHost ? '<i class="fa-solid fa-crown text-yellow-400 text-xs" title="Host"></i>' : ''}
                 ${!micEnabled ? '<i class="fa-solid fa-microphone-slash text-red-400 text-xs" title="Muted"></i>' : ''}
@@ -859,10 +858,10 @@
                 const conn = activeConnections[id];
                 const div = document.createElement('div');
                 div.className = "flex items-center gap-3 p-2 rounded-lg hover:bg-discord-dark/20 transition cursor-pointer";
-                const peerAvatar = conn.avatar || '👤';
-                const peerAvatarHtml = peerAvatar.startsWith('data:') ? `<img src="${peerAvatar}" class="w-6 h-6 rounded-full object-cover">` : `<span class="text-lg">${peerAvatar}</span>`;
+                const peerAvatar = conn.avatar || '';
+                const peerAvatarEl = renderAvatarHTML(peerAvatar, conn.username || 'User', "w-6 h-6 text-xs");
                 div.innerHTML = `
-                    <div class="w-6 h-6 rounded-full flex items-center justify-center overflow-hidden">${peerAvatarHtml}</div>
+                    ${peerAvatarEl}
                     <span class="text-xs font-medium text-gray-300 truncate flex-1">${conn.username || 'User'}</span>
                     ${conn.isHost ? '<i class="fa-solid fa-crown text-yellow-400 text-xs" title="Host"></i>' : ''}
                     ${conn.micMuted ? '<i class="fa-solid fa-microphone-slash text-red-400 text-xs" title="Muted"></i>' : ''}
